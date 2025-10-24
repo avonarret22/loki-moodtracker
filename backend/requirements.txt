@@ -11,3 +11,4 @@ anthropic==0.39.0
 requests==2.31.0
 spacy==3.7.2
 textblob==0.17.1
+twilio>=8.0.0

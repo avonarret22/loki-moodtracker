@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     )
     OPENAI_API_KEY: str | None = Field(default=None, env="OPENAI_API_KEY")
     ANTHROPIC_API_KEY: str | None = Field(default=None, env="ANTHROPIC_API_KEY")
+    
+    # Twilio WhatsApp Configuration
+    TWILIO_ACCOUNT_SID: str | None = Field(default=None, env="TWILIO_ACCOUNT_SID")
+    TWILIO_AUTH_TOKEN: str | None = Field(default=None, env="TWILIO_AUTH_TOKEN")
+    TWILIO_WHATSAPP_NUMBER: str | None = Field(default="whatsapp:+14155238886", env="TWILIO_WHATSAPP_NUMBER")
+    
+    # Meta WhatsApp (legacy - mantener por compatibilidad)
     WHATSAPP_ACCESS_TOKEN: str | None = Field(default=None, env="WHATSAPP_ACCESS_TOKEN")
     WHATSAPP_VERIFY_TOKEN: str | None = Field(default=None, env="WHATSAPP_VERIFY_TOKEN")
     WHATSAPP_PHONE_NUMBER_ID: str | None = Field(default=None, env="WHATSAPP_PHONE_NUMBER_ID")
