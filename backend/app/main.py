@@ -6,8 +6,7 @@ from app.api.routes.mood import router as mood_router
 from app.api.routes.habits import router as habits_router
 from app.api.routes.analytics import router as analytics_router
 from app.api.routes.whatsapp import router as whatsapp_router
-# Temporalmente comentado hasta que Railway instale twilio
-# from app.api.routes.twilio import router as twilio_router  # Nuevo - Twilio
+from app.api.routes.twilio import router as twilio_router  # Twilio WhatsApp
 from app.api.routes.chat import router as chat_router
 from app.api.routes.patterns import router as patterns_router
 from app.core.config import settings
@@ -41,8 +40,7 @@ def create_app() -> FastAPI:
     app.include_router(habits_router, prefix=settings.API_V1_STR, tags=["habits"])
     app.include_router(analytics_router, prefix=settings.API_V1_STR, tags=["analytics"])
     app.include_router(whatsapp_router, prefix="/whatsapp", tags=["whatsapp"])
-    # Temporalmente comentado hasta que Railway instale twilio
-    # app.include_router(twilio_router, prefix="/twilio", tags=["twilio"])  # Nuevo - Twilio
+    app.include_router(twilio_router, prefix="/twilio", tags=["twilio"])  # Twilio WhatsApp
     app.include_router(chat_router, prefix=settings.API_V1_STR + "/chat", tags=["chat"])
     app.include_router(patterns_router, prefix=settings.API_V1_STR + "/patterns", tags=["patterns"])
 
