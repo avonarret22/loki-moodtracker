@@ -104,13 +104,21 @@ class WhatsAppService:
             }
         }
         
+        print(f"📤 Enviando mensaje a WhatsApp:")
+        print(f"   URL: {url}")
+        print(f"   To: {phone_number}")
+        print(f"   Message: {message[:50]}...")
+        
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(url, json=payload, headers=headers)
                 response.raise_for_status()
+                print(f"✅ Mensaje enviado exitosamente")
                 return response.json()
         except httpx.HTTPError as e:
-            print(f"Error sending WhatsApp message: {e}")
+            print(f"❌ Error sending WhatsApp message: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                print(f"   Response body: {e.response.text}")
             return {"error": str(e)}
     
     async def mark_message_as_read(
