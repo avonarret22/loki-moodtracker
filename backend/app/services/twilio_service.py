@@ -3,11 +3,20 @@ Servicio para integración con Twilio WhatsApp API.
 Maneja el envío de mensajes a través de Twilio.
 """
 
-from twilio.rest import Client
+try:
+    from twilio.rest import Client
+    TWILIO_AVAILABLE = True
+except ImportError:
+    TWILIO_AVAILABLE = False
+    Client = None
+    
 from app.core.config import settings
 import logging
 
 logger = logging.getLogger(__name__)
+
+if not TWILIO_AVAILABLE:
+    logger.warning("⚠️ Twilio package not installed. Install with: pip install twilio>=8.0.0")
 
 
 class TwilioWhatsAppService:
@@ -15,6 +24,10 @@ class TwilioWhatsAppService:
     
     def __init__(self):
         """Inicializa el cliente de Twilio."""
+        if not TWILIO_AVAILABLE:
+            logger.error("❌ Cannot initialize Twilio service: twilio package not installed")
+            raise ImportError("twilio package is required. Install with: pip install twilio>=8.0.0")
+            
         self.account_sid = settings.TWILIO_ACCOUNT_SID
         self.auth_token = settings.TWILIO_AUTH_TOKEN
         self.from_number = settings.TWILIO_WHATSAPP_NUMBER  # whatsapp:+14155238886
