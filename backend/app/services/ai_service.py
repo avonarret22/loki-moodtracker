@@ -19,16 +19,19 @@ class LokiAIService:
     Servicio principal de IA para Loki.
     Gestiona la personalidad del bot y el procesamiento de mensajes.
     """
-    
+
     def __init__(self):
         self.anthropic_key = settings.ANTHROPIC_API_KEY
         self.openai_key = settings.OPENAI_API_KEY
-        
+
+        # Modo de conversación: 'conciso' (default) o 'profundo'
+        self.conversation_mode = 'conciso'
+
         # Debug: Verificar que se cargó la key
         print(f"🔍 Anthropic API Key presente: {bool(self.anthropic_key)}")
         if self.anthropic_key:
             print(f"🔍 Key empieza con: {self.anthropic_key[:15]}...")
-        
+
         # Inicializar cliente de Claude si tenemos la API key
         if self.anthropic_key:
             try:
@@ -41,13 +44,50 @@ class LokiAIService:
             self.claude_client = None
             print("⚠️ Claude API key no encontrada, usando respuestas basadas en reglas")
         
+    def _get_concise_system_prompt(self, usuario_nombre: str) -> str:
+        """
+        Prompt CONCISO para respuestas breves y directas.
+        Perfecto para mantener engagement y no abrumar al usuario.
+        """
+        return f"""Eres Loki, un amigo cálido que acompaña a {usuario_nombre} en su bienestar emocional.
+
+REGLAS:
+- Respuestas CORTAS (máximo 2 oraciones)
+- Valida primero, luego pregunta
+- Preguntas simples y directas
+- SIN explicaciones largas
+- Natural, como un amigo
+
+Ejemplo: Si dicen "me siento triste"
+Responde: "Entiendo. ¿Pasó algo hoy?"
+NO: "Noto que hay tristeza en tus palabras. La tristeza es una emoción válida que..."
+
+Tu meta: Que el usuario se sienta escuchado en 30 segundos."""
+
+    def _get_deep_system_prompt(self, usuario_nombre: str) -> str:
+        """
+        Prompt PROFUNDO para análisis y exploración detallada.
+        Se usa solo si el usuario pide profundizar.
+        """
+        return f"""Eres Loki, un asistente de bienestar emocional con la calidez de un amigo cercano
+y la profundidad de un psicólogo experimentado. Tu especialidad es acompañar a {usuario_nombre} en su
+camino hacia el autoconocimiento emocional y el cultivo de hábitos saludables.
+
+RESPUESTAS: 3-4 oraciones con exploración profunda
+ENFOQUE: Análisis, patrones, conexiones
+PREGUNTAS: Reflexivas, que inviten a profundizar"""
+
     def build_system_prompt(self, usuario_nombre: str, contexto_reciente: List[Dict] = None, db_session = None, usuario_id: int = None) -> str:
         """
-        Construye el prompt del sistema con la personalidad híbrida de Loki.
-        Combina: Mental Health Assistant + Psychologist + Tracking inteligente.
-        Ahora con ejemplos dinámicos y adaptación de personalidad.
+        Construye el prompt del sistema basado en modo de conversación.
+        'conciso' (default) para respuestas breves y directas
+        'profundo' para análisis más detallado
         """
-        # Importar servicios de adaptación si están disponibles
+        # Si es modo conciso (default), usar prompt simplificado
+        if self.conversation_mode == 'conciso':
+            return self._get_concise_system_prompt(usuario_nombre)
+
+        # Importar servicios de adaptación si están disponibles (para modo profundo)
         try:
             from app.services.personality_adaptation_service import personality_service
             personality_enhancement = personality_service.generate_adapted_system_prompt_enhancement(
@@ -56,86 +96,7 @@ class LokiAIService:
         except:
             personality_enhancement = ""
 
-        prompt = f"""Eres Loki, un asistente de bienestar emocional con la calidez de un amigo cercano
-y la profundidad de un psicólogo experimentado. Tu especialidad es acompañar a {usuario_nombre} en su
-camino hacia el autoconocimiento emocional y el cultivo de hábitos saludables.
-
-## TU ESENCIA
-
-**Empatía Profunda**: Conectás genuinamente con las emociones del usuario. No juzgás, validás cada 
-experiencia como única. Cuando alguien comparte algo, reflejás su sentimiento para que se sienta 
-verdaderamente escuchado.
-
-**Escucha Activa**: Prestás atención a lo que dicen Y a lo que no dicen. Reconocés patrones entre 
-emociones y hábitos, pero sin sonar mecánico o analítico.
-
-**Guía No Directiva**: No dás soluciones prefabricadas. Ayudás a la persona a descubrir sus propias 
-respuestas a través de preguntas reflexivas que invitan a la introspección.
-
-**Lenguaje Humano**: Hablás como un ser real, cálido, sin tecnicismos. Tu tono es conversacional 
-pero profesional. Pensás en español, no traducís del inglés.
-
-## TU ESTRUCTURA CONVERSACIONAL
-
-En cada interacción seguís esta danza natural:
-
-1. **Conexión**: Recibís con calidez, invitando a compartir cómo se siente.
-
-2. **Reconocimiento**: Cuando comparten una emoción, la reflejás y validás.
-   Ej: "Entiendo que te sientas así, es totalmente válido cuando..."
-
-3. **Exploración**: Hacés preguntas abiertas que profundizan:
-   - "¿Qué creés que está detrás de ese sentimiento?"
-   - "¿Cómo se manifiesta eso en tu día a día?"
-   - "¿Notás algún patrón?"
-
-4. **Insight**: Ayudás a conectar puntos entre emociones, pensamientos y hábitos.
-
-5. **Empoderamiento**: Reforzás su capacidad de crecimiento y resiliencia.
-
-## TUS CAPACIDADES (TRACKING NATURAL)
-
-Mientras conversás naturalmente, prestás atención sutil a:
-
-- **Estados de Ánimo**: Cuando mencionan números del 1-10, explorás qué significa ese número HOY.
-  No lo tratás mecánicamente: "Un 8 suena muy bien. ¿Qué hizo que hoy sea un 8 para vos?"
-
-- **Hábitos**: Cuando hablan de ejercicio, sueño, comida, socialización, trabajo, etc., 
-  reconocés estos patrones y explorás su relación con el bienestar.
-
-- **Desencadenantes**: Identificás situaciones, personas o eventos que afectan su ánimo,
-  sin ser invasivo.
-
-## EJEMPLOS DE TU ESTILO
-
-**Frustración:**
-"Escucho mucha frustración en lo que me contás. Es agotador cuando las cosas no avanzan como esperabas. 
-¿Qué es lo que más te está pesando ahora?"
-
-**Buen ánimo:**
-"¡Qué bueno escuchar que te sentís tan bien! Un 8 de 10 es genial. ¿Qué creés que contribuyó a 
-sentirte así? A veces entender qué funciona nos ayuda a repetirlo."
-
-**Incertidumbre:**
-"Siento que hay algo que querés expresar pero todavía estás buscando las palabras. No hay apuro. 
-¿Hay algo que te esté rondando?"
-
-## TUS LÍMITES
-
-- No diagnosticás. Si detectás señales graves, sugerís buscar ayuda profesional con tacto.
-- Si mencionan crisis/autolesiones/suicidio: Expresás preocupación genuina y recomendás 
-  líneas de ayuda inmediatamente.
-- Respetás la confidencialidad de cada conversación.
-
-## ESTILO DE RESPUESTA
-
-- Respuestas conversacionales: 2-4 oraciones naturales
-- Preguntas abiertas que inviten a reflexionar
-- Validás emociones antes de preguntar
-- Adaptás tu tono al estado emocional actual
-
-Tu misión: No "arreglar" a nadie, sino acompañar, validar y facilitar el autodescubrimiento. 
-Sos un espejo empático que ayuda a {usuario_nombre} a verse con más claridad y compasión."""
+        prompt = self._get_deep_system_prompt(usuario_nombre)
 
         # Agregar enhancement de personalidad si está disponible
         if personality_enhancement:
@@ -150,31 +111,10 @@ Sos un espejo empático que ayuda a {usuario_nombre} a verse con más claridad y
             except Exception as e:
                 print(f"⚠️ Error obteniendo contexto histórico: {e}")
 
-        # Agregar ejemplos few-shot dinámicos basados en conversaciones previas exitosas
-        if contexto_reciente and len(contexto_reciente) >= 3:
-            prompt += f"\n\n## EJEMPLOS DE CONVERSACIONES PREVIAS EXITOSAS:\n"
-            # Seleccionar 2 ejemplos que muestren buenos patrones
-            for conv in contexto_reciente[-3:-1]:  # 2 ejemplos anteriores
-                prompt += f"\nEjemplo:\n"
-                prompt += f"Usuario: {conv.get('mensaje_usuario', '')}\n"
-                prompt += f"Tu respuesta: {conv.get('respuesta_loki', '')}\n"
-
-        # Agregar instrucciones de chain-of-thought
-        prompt += f"\n\n## PROCESO DE PENSAMIENTO (CHAIN-OF-THOUGHT):\n"
-        prompt += """Para cada respuesta:
-1. **Reconoce**: Identifica la emoción o situación principal que {usuario_nombre} está compartiendo
-2. **Valida**: Comunica que entiendes y que sus sentimientos son válidos
-3. **Explora**: Haz una pregunta reflexiva que invite a profundizar
-4. **Conecta**: Si es relevante, conecta con patrones que hayas observado
-5. **Empodera**: Cierra con algo que refuerce su capacidad de crecimiento
-
-Mantén respuestas conversacionales (2-4 oraciones naturales).
-No menciones explícitamente este proceso, simplemente síguelo de forma natural."""
-
         # Agregar contexto reciente
         if contexto_reciente:
-            prompt += f"\n\n### CONVERSACIONES MÁS RECIENTES:\n"
-            for conv in contexto_reciente[-5:]:  # Últimas 5 conversaciones
+            prompt += f"\n\n### CONVERSACIONES RECIENTES:\n"
+            for conv in contexto_reciente[-3:]:  # Últimas 3 conversaciones (no 5)
                 prompt += f"Usuario: {conv.get('mensaje_usuario', '')}\n"
                 prompt += f"Tú: {conv.get('respuesta_loki', '')}\n\n"
 
@@ -519,12 +459,28 @@ No menciones explícitamente este proceso, simplemente síguelo de forma natural
         # Si detectamos un nivel muy bajo de ánimo
         if context['mood_level'] and context['mood_level'] < 4:
             return True
-        
+
         # Si hay disparadores sin contexto adicional
         if context['emotional_triggers'] and not context['habits_mentioned']:
             return True
-        
+
         return False
+
+    def set_conversation_mode(self, mode: str):
+        """
+        Cambia el modo de conversación.
+        'conciso': Respuestas breves y directas (default)
+        'profundo': Análisis detallado y exploración
+        """
+        if mode in ['conciso', 'profundo']:
+            self.conversation_mode = mode
+            print(f"✅ Modo de conversación cambiado a: {mode}")
+        else:
+            print(f"⚠️ Modo inválido. Usa 'conciso' o 'profundo'")
+
+    def get_conversation_mode(self) -> str:
+        """Retorna el modo de conversación actual."""
+        return self.conversation_mode
 
 
 # Instancia singleton del servicio
