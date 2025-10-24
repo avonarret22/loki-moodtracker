@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loki - MoodTracker</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">🎭</span>
+                <h1>Loki MoodTracker</h1>
+            </div>
+            <div class="user-info" id="userInfo">
+                <span class="user-name" id="userName">Cargando...</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="stats-section">
+                    <h3>📊 Estadísticas</h3>
+                    <div class="stat-card">
+                        <div class="stat-label">Conversaciones</div>
+                        <div class="stat-value" id="totalConversations">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Estados registrados</div>
+                        <div class="stat-value" id="totalMoods">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Último ánimo</div>
+                        <div class="stat-value" id="lastMood">-</div>
+                    </div>
+                </div>
+
+                <div class="habits-section">
+                    <h3>✅ Hábitos detectados</h3>
+                    <div id="habitsList" class="habits-list">
+                        <p class="empty-state">Ningún hábito detectado aún</p>
+                    </div>
+                </div>
+
+                <div class="actions-section">
+                    <button class="btn-secondary" onclick="viewHistory()">
+                        📜 Ver Historial
+                    </button>
+                    <button class="btn-secondary" onclick="viewMoods()">
+                        😊 Ver Estados
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Chat Area -->
+            <main class="chat-area">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="welcome-message">
+                        <div class="loki-avatar">🎭</div>
+                        <div class="message-bubble loki-message">
+                            <p><strong>¡Hola! Soy Loki.</strong></p>
+                            <p>Estoy aquí para ayudarte a entender tus emociones y hábitos. Cuéntame, ¿cómo te sientes hoy?</p>
+                            <p class="tip">💡 <em>Tip: Menciona tu nivel de ánimo (1-10) y tus hábitos (ejercicio, sueño, meditación, etc.)</em></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-input-container">
+                    <div class="typing-indicator" id="typingIndicator" style="display: none;">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        Loki está escribiendo...
+                    </div>
+                    <form class="chat-input-form" id="chatForm" onsubmit="sendMessage(event)">
+                        <textarea 
+                            id="messageInput" 
+                            placeholder="Escribe tu mensaje a Loki..." 
+                            rows="1"
+                            onkeydown="handleKeyDown(event)"
+                        ></textarea>
+                        <button type="submit" class="btn-send" id="sendButton">
+                            <span>Enviar</span>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M2 10L18 2L11 18L9 11L2 10Z"/>
+                            </svg>
+                        </button>
+                    </form>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modal para historial -->
+    <div id="historyModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📜 Historial de Conversaciones</h2>
+                <button class="modal-close" onclick="closeModal('historyModal')">&times;</button>
+            </div>
+            <div class="modal-body" id="historyContent">
+                <p>Cargando...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para estados de ánimo -->
+    <div id="moodsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>😊 Estados de Ánimo</h2>
+                <button class="modal-close" onclick="closeModal('moodsModal')">&times;</button>
+            </div>
+            <div class="modal-body" id="moodsContent">
+                <p>Cargando...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

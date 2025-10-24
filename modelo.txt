@@ -1,0 +1,331 @@
+# LOKI - Chatbot Guía Emocional
+## Resumen Ejecutivo para Desarrollo
+
+---
+
+## 🎯 CONCEPTO CORE
+
+**Chatbot de WhatsApp impulsado por IA** que registra estados emocionales y hábitos de manera conversacional, no intrusiva pero constante, generando reportes personalizados y correlaciones significativas entre acciones y bienestar emocional.
+
+**Objetivo:** Crear un vínculo genuino donde las personas *esperen* el mensaje de Loki, convirtiéndolo en un compañero de bienestar, no solo una app de tracking.
+
+---
+
+## 🏗️ ARQUITECTURA DEL SISTEMA
+
+### **3 Componentes Principales:**
+
+1. **Bot de WhatsApp (Loki)**
+   - WhatsApp Business API
+   - IA conversacional (Claude API o GPT-4)
+   - Sistema de memoria contextual profunda
+
+2. **Backend & Base de Datos**
+   - Registro de estados de ánimo, hábitos, conversaciones
+   - Motor de análisis y correlaciones
+   - Sistema de alertas y frecuencia adaptativa
+
+3. **Dashboard Web**
+   - Visualización de reportes
+   - Gestión de hábitos y configuraciones
+   - Exportación de datos
+
+---
+
+## 📊 MODELO DE DATOS
+
+### **Tablas principales:**
+
+```sql
+Usuarios
+- id, nombre, telefono, timezone, nivel_CMV
+- preferencias_tracking, frecuencia_checkins
+- fecha_registro
+
+EstadosAnimo
+- usuario_id, timestamp, nivel (1-10)
+- notas_texto, contexto_extraido
+- disparadores_detectados
+
+Habitos (catálogo personal)
+- usuario_id, nombre_habito, categoria
+- objetivo_semanal, activo
+
+RegistrosHabitos
+- usuario_id, habito_id, timestamp
+- completado, notas
+
+ConversacionesContexto
+- usuario_id, timestamp, mensaje_usuario
+- respuesta_loki, entidades_extraidas
+- categorias_detectadas
+
+Correlaciones (calculadas)
+- usuario_id, factor, impacto_animo
+- confianza_estadistica, num_datos
+```
+
+---
+
+## 🧠 SISTEMA DE IA CONVERSACIONAL
+
+### **Personalidad de Loki:**
+- Empático pero no paternalista
+- Memoria contextual completa
+- Aprende de cada interacción
+- Adapta tono según estado emocional del usuario
+
+### **Capacidades clave:**
+
+**1. Tracking flexible:**
+- Formal: Hábitos predefinidos por usuario
+- Informal: Extracción de patrones conversacionales mediante NLP
+- Ejemplo: Usuario menciona "salí con amigos" → Loki registra factor social
+
+**2. Indagación inteligente:**
+```
+Usuario: "8/10 hoy"
+Loki: "¡Qué bueno! ¿Qué crees que hizo que te sintieras así?"
+→ Extrae contexto → Construye perfil sin formularios rígidos
+```
+
+**3. Detección de patrones:**
+- Identifica en texto libre: trabajo, sueño, social, ejercicio, estrés
+- Categoriza automáticamente sin que usuario lo estructure
+- Propone convertir patrones en hábitos formales
+
+---
+
+## 📈 CMV (CONTEXTO MÍNIMO VIABLE)
+
+Sistema de niveles que determina qué puede hacer Loki:
+
+### **Nivel 0 - Onboarding (Día 1)**
+- Recolección básica: nombre, timezone, 3-5 hábitos
+- Modo aprendizaje puro: solo escucha y registra
+
+### **Nivel 1 - CMV Básico (5-7 días)**
+**Requiere:**
+- 10-15 registros de ánimo
+- 5+ registros de hábitos o conversaciones
+- 1 ciclo completo semana
+
+**Puede hacer:**
+- Promedios básicos
+- Correlaciones iniciales con disclaimer
+- "Es temprano pero noto que..."
+
+### **Nivel 2 - CMV Completo (15-20 días)**
+**Requiere:**
+- 30-40 registros de ánimo
+- 15-20 registros de hábitos/contexto
+- 2-3 semanas de datos variados
+
+**Puede hacer:**
+- Correlaciones estadísticamente significativas
+- Sugerencias proactivas basadas en patrones
+- Intervenciones adaptativas con confianza
+
+### **Nivel 3 - Perfil Avanzado (30+ días)**
+**Puede hacer:**
+- Predicciones ("normalmente los lunes bajas")
+- Detección de ciclos y tendencias
+- Comparaciones temporales
+- Alertas predictivas
+
+---
+
+## 🔄 SISTEMA DE FRECUENCIA ADAPTATIVA
+
+**Tracking dinámico basado en estado:**
+
+```
+Ánimo normal (6-10): 2-3 check-ins/día
+  └─ Mañana, tarde, noche
+
+Ánimo bajo (4-5): 4-5 check-ins/día
+  └─ Cada 3-4 horas
+  └─ Recordatorios de hábitos que suelen ayudar
+
+Estado crítico (1-3 por 2+ días): Modo acompañamiento
+  └─ Check-ins cada 2-3 horas
+  └─ Recursos de ayuda profesional
+  └─ "Hoy estaré más atento a ti"
+```
+
+---
+
+## 🚨 SISTEMA DE RESPUESTA INTELIGENTE
+
+### **Escenario 1: Usuario con historial**
+```
+Usuario: 3/10 me siento mal
+Loki: "Veo que llevas 3 días sin ejercicio, y normalmente 
+cuando lo haces subes a 7-8. No presiono, solo recuerdo 
+lo que suele ayudarte"
+```
+
+### **Escenario 2: Usuario sin datos suficientes**
+```
+Usuario: Estoy terrible
+Loki: "Como aún nos estamos conociendo, no sé qué te 
+ayuda. ¿Hacemos check-ins más seguidos hoy para 
+identificar juntos qué te hace sentir mejor?
+
+Y recuerda: nunca está de más hablar con alguien 
+cercano o un profesional"
+```
+
+### **Escenario 3: Crisis detectada**
+```
+Loki: "Llevas 4 días con ánimo bajo (promedio 3.5). 
+Eso me preocupa. ¿Has considerado hablar con alguien?
+
+[Ofrece líneas de crisis según país]
+
+Mientras tanto estaré más atento. ¿Hablamos cada 
+3 horas hoy?"
+```
+
+---
+
+## 📊 REPORTES Y ANALYTICS
+
+### **Reporte semanal incluye:**
+
+**Tu semana emocional:**
+- Promedio, mejor/peor día
+- Gráfica de tendencia
+
+**Hábitos y bienestar:**
+- Días con hábito X: ánimo promedio Y
+- Rachas actuales
+- Correlaciones detectadas
+
+**Insights generados por IA:**
+- "Tus lunes son consistentemente difíciles"
+- "Cuando haces ejercicio, subes 2.3 puntos"
+- "Llevas 5 días sin contacto social y tu ánimo bajó"
+
+**Alertas:**
+- Identificación de patrones preocupantes
+- Sugerencias de cambio basadas en TUS datos
+
+### **Dashboard web muestra:**
+- Gráficas interactivas de ánimo/hábitos
+- Heatmaps de mejor/peor momento del día
+- Correlaciones con confianza estadística
+- Patrones conversacionales detectados
+- Estado del CMV (% de perfil completo)
+- Exportación a PDF
+
+---
+
+## 🛡️ CONSIDERACIONES CRÍTICAS
+
+### **Ética y seguridad:**
+- ✅ Dejar claro que NO es terapia
+- ✅ Derivar a profesionales en crisis
+- ✅ No diagnosticar, solo validar emociones
+- ✅ Encriptación end-to-end
+- ✅ Líneas de crisis según país del usuario
+
+### **Privacidad:**
+- Datos sensibles encriptados
+- Opción de "pausar tracking"
+- Nunca compartir sin consentimiento explícito
+- GDPR compliant
+
+### **Detección de crisis:**
+Protocolo especial si detecta frases como:
+- "No quiero estar aquí"
+- "Sería más fácil si no existiera"
+- Mención de autolesión
+
+→ Activar recursos de emergencia inmediatos
+
+---
+
+## 🎯 MVP (MÍNIMO VIABLE)
+
+### **Fase 1 - Probar el vínculo (2-3 semanas de desarrollo):**
+
+**Features esenciales:**
+1. Bot de WhatsApp funcional
+2. 2-3 check-ins diarios de ánimo
+3. Tracking de 3-5 hábitos elegidos por usuario
+4. Indagación conversacional básica ("¿por qué te sientes así?")
+5. Base de datos registrando todo
+6. Reporte semanal básico vía WhatsApp (texto)
+7. Sistema de frecuencia adaptativa básico
+
+**Objetivo:** Validar si la gente crea vínculo con Loki
+
+### **Fase 2 - Dashboard y análisis (siguiente):**
+1. Dashboard web con visualizaciones
+2. Correlaciones automáticas
+3. Sistema CMV completo
+4. NLP avanzado para extracción de patrones
+
+### **Fase 3 - Optimización:**
+1. Predicciones y alertas proactivas
+2. Sugerencias de nuevos hábitos basadas en perfil
+3. Integración con wearables (opcional)
+4. Comunidad/grupos de apoyo
+
+---
+
+## 🔧 STACK TECNOLÓGICO SUGERIDO
+
+**Backend:**
+- Node.js o Python (FastAPI)
+- WhatsApp Business API
+- PostgreSQL o MongoDB
+- Claude API o GPT-4 para conversaciones
+
+**IA/NLP:**
+- Extracción de entidades (spaCy o API de Claude)
+- Análisis de sentimiento contextual
+- Sistema de prompts cuidadosamente diseñado
+
+**Frontend:**
+- React o Next.js
+- Chart.js / D3.js para visualizaciones
+- Autenticación segura (Auth0 o similar)
+
+**Infraestructura:**
+- Heroku/Railway/AWS para hosting
+- Webhooks para WhatsApp
+- Cron jobs para check-ins programados
+
+---
+
+## 💡 VALOR DIFERENCIAL
+
+**Lo que hace único a Loki:**
+
+1. ✅ **Conversacional, no formularios**: Aprende a través de diálogo natural
+2. ✅ **Tracking dual**: Formal (hábitos) + Informal (conversaciones)
+3. ✅ **Frecuencia adaptativa**: Más atento cuando más lo necesitas
+4. ✅ **Insights personalizados**: Basados en TUS datos, no genéricos
+5. ✅ **Vínculo emocional**: Diseñado para que lo esperes, no que lo ignores
+6. ✅ **WhatsApp**: Donde la gente ya está, sin nueva app
+
+---
+
+## ✅ CHECKLIST DE INICIO DE DESARROLLO
+
+- [ ] Configurar WhatsApp Business API
+- [ ] Diseñar schema de base de datos
+- [ ] Crear sistema de prompts para Loki (personalidad base)
+- [ ] Implementar flujo de onboarding
+- [ ] Sistema básico de check-ins programados
+- [ ] Registro de ánimo + indagación simple
+- [ ] Lógica de frecuencia adaptativa
+- [ ] Cálculo de correlaciones básicas
+- [ ] Reporte semanal por WhatsApp
+- [ ] Protocolo de crisis/recursos de ayuda
+
+---
+
+**¿Listo para empezar a construir?** 🚀

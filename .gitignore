@@ -1,0 +1,28 @@
+# General
+__pycache__/
+*.py[cod]
+*.log
+.DS_Store
+*.sqlite3
+*.db
+moodtracker.db
+.env
+.venv/
+venv/
+
+# Python tooling
+.pytest_cache/
+.mypy_cache/
+
+# Node/Frontend tooling
+node_modules/
+.next/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+
+# Docker
+postgres_data/
