@@ -43,16 +43,25 @@ async def receive_webhook(request: Request, db: Session = Depends(get_db)):
         # Obtener el cuerpo del webhook
         body = await request.json()
         
+        print(f"📥 Webhook recibido:")
+        print(f"   Body completo: {json.dumps(body, indent=2, ensure_ascii=False)}")
+        
         # Parsear el mensaje
         parsed_message = whatsapp_service.parse_webhook_message(body)
         
         if not parsed_message:
             # No es un mensaje de texto válido, ignorar
+            print("⚠️ No es un mensaje de texto válido, ignorando")
             return {"status": "ok"}
         
         phone_number = parsed_message['phone_number']
         message_text = parsed_message['message_text']
         message_id = parsed_message['message_id']
+        
+        print(f"📱 Mensaje parseado:")
+        print(f"   Número: {phone_number}")
+        print(f"   Texto: {message_text}")
+        print(f"   ID: {message_id}")
         
         # Buscar o crear usuario basado en el número de teléfono
         usuario = crud.get_usuario_by_telefono(db, telefono=phone_number)
