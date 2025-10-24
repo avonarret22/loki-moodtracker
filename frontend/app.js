@@ -1,5 +1,5 @@
 // Configuración
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = 'https://web-production-3e691.up.railway.app/api/v1';
 let currentUser = null;
 let allHabits = new Set();
 

@@ -10,6 +10,8 @@ from datetime import datetime
 from anthropic import Anthropic
 
 from app.core.config import settings
+from app.services.nlp_service import nlp_service
+from app.services.memory_service import memory_service
 
 
 class LokiAIService:
@@ -39,13 +41,23 @@ class LokiAIService:
             self.claude_client = None
             print("⚠️ Claude API key no encontrada, usando respuestas basadas en reglas")
         
-    def build_system_prompt(self, usuario_nombre: str, contexto_reciente: List[Dict] = None) -> str:
+    def build_system_prompt(self, usuario_nombre: str, contexto_reciente: List[Dict] = None, db_session = None, usuario_id: int = None) -> str:
         """
         Construye el prompt del sistema con la personalidad híbrida de Loki.
         Combina: Mental Health Assistant + Psychologist + Tracking inteligente.
+        Ahora con ejemplos dinámicos y adaptación de personalidad.
         """
-        prompt = f"""Eres Loki, un asistente de bienestar emocional con la calidez de un amigo cercano 
-y la profundidad de un psicólogo experimentado. Tu especialidad es acompañar a {usuario_nombre} en su 
+        # Importar servicios de adaptación si están disponibles
+        try:
+            from app.services.personality_adaptation_service import personality_service
+            personality_enhancement = personality_service.generate_adapted_system_prompt_enhancement(
+                db_session, usuario_id, usuario_nombre, None
+            ) if db_session and usuario_id else ""
+        except:
+            personality_enhancement = ""
+
+        prompt = f"""Eres Loki, un asistente de bienestar emocional con la calidez de un amigo cercano
+y la profundidad de un psicólogo experimentado. Tu especialidad es acompañar a {usuario_nombre} en su
 camino hacia el autoconocimiento emocional y el cultivo de hábitos saludables.
 
 ## TU ESENCIA
@@ -125,12 +137,47 @@ sentirte así? A veces entender qué funciona nos ayuda a repetirlo."
 Tu misión: No "arreglar" a nadie, sino acompañar, validar y facilitar el autodescubrimiento. 
 Sos un espejo empático que ayuda a {usuario_nombre} a verse con más claridad y compasión."""
 
+        # Agregar enhancement de personalidad si está disponible
+        if personality_enhancement:
+            prompt += personality_enhancement
+
+        # Agregar contexto histórico de largo plazo si disponible
+        if db_session and usuario_id:
+            try:
+                long_term_context = memory_service.get_long_term_context(db_session, usuario_id)
+                if long_term_context:
+                    prompt += f"\n\n{long_term_context}"
+            except Exception as e:
+                print(f"⚠️ Error obteniendo contexto histórico: {e}")
+
+        # Agregar ejemplos few-shot dinámicos basados en conversaciones previas exitosas
+        if contexto_reciente and len(contexto_reciente) >= 3:
+            prompt += f"\n\n## EJEMPLOS DE CONVERSACIONES PREVIAS EXITOSAS:\n"
+            # Seleccionar 2 ejemplos que muestren buenos patrones
+            for conv in contexto_reciente[-3:-1]:  # 2 ejemplos anteriores
+                prompt += f"\nEjemplo:\n"
+                prompt += f"Usuario: {conv.get('mensaje_usuario', '')}\n"
+                prompt += f"Tu respuesta: {conv.get('respuesta_loki', '')}\n"
+
+        # Agregar instrucciones de chain-of-thought
+        prompt += f"\n\n## PROCESO DE PENSAMIENTO (CHAIN-OF-THOUGHT):\n"
+        prompt += """Para cada respuesta:
+1. **Reconoce**: Identifica la emoción o situación principal que {usuario_nombre} está compartiendo
+2. **Valida**: Comunica que entiendes y que sus sentimientos son válidos
+3. **Explora**: Haz una pregunta reflexiva que invite a profundizar
+4. **Conecta**: Si es relevante, conecta con patrones que hayas observado
+5. **Empodera**: Cierra con algo que refuerce su capacidad de crecimiento
+
+Mantén respuestas conversacionales (2-4 oraciones naturales).
+No menciones explícitamente este proceso, simplemente síguelo de forma natural."""
+
+        # Agregar contexto reciente
         if contexto_reciente:
-            prompt += f"\n\nCONTEXTO RECIENTE:\n"
+            prompt += f"\n\n### CONVERSACIONES MÁS RECIENTES:\n"
             for conv in contexto_reciente[-5:]:  # Últimas 5 conversaciones
                 prompt += f"Usuario: {conv.get('mensaje_usuario', '')}\n"
-                prompt += f"Tú: {conv.get('respuesta_loki', '')}\n"
-        
+                prompt += f"Tú: {conv.get('respuesta_loki', '')}\n\n"
+
         return prompt
     
     def extract_mood_level(self, mensaje: str) -> Optional[int]:
@@ -212,22 +259,44 @@ Sos un espejo empático que ayuda a {usuario_nombre} a verse con más claridad y
         
         return triggers
     
-    def analyze_message_context(self, mensaje: str) -> Dict[str, Any]:
+    def analyze_message_context(self, mensaje: str, conversation_history: List[str] = None) -> Dict[str, Any]:
         """
         Análisis completo del mensaje para extraer toda la información relevante.
+        Usa tanto análisis clásicos (mood, hábitos, triggers) como análisis NLP avanzado.
+
+        Args:
+            mensaje: El mensaje a analizar
+            conversation_history: Historial de mensajes anteriores para análisis de patrones
         """
+        # Análisis clásicos (mantener compatibilidad)
         context = {
             'mood_level': self.extract_mood_level(mensaje),
             'habits_mentioned': self.extract_habits_mentioned(mensaje),
             'emotional_triggers': self.extract_emotional_triggers(mensaje),
             'timestamp': datetime.utcnow().isoformat(),
         }
-        
+
+        # Análisis NLP avanzado
+        advanced_nlp = nlp_service.analyze_complete_context(
+            mensaje,
+            conversation_history=conversation_history
+        )
+
+        # Enriquecer contexto con análisis avanzado
+        context['nlp_analysis'] = {
+            'sentiment': advanced_nlp['sentiment'],
+            'entities': advanced_nlp['entities'],
+            'values_detected': advanced_nlp['values'],
+        }
+
+        if 'language_patterns' in advanced_nlp:
+            context['language_patterns'] = advanced_nlp['language_patterns']
+
         return context
     
     async def generate_response(
-        self, 
-        mensaje_usuario: str, 
+        self,
+        mensaje_usuario: str,
         usuario_nombre: str,
         contexto_reciente: List[Dict] = None,
         user_context: Dict = None,
@@ -236,13 +305,18 @@ Sos un espejo empático que ayuda a {usuario_nombre} a verse con más claridad y
     ) -> Dict[str, Any]:
         """
         Genera una respuesta de Loki basada en el mensaje del usuario.
-        Ahora incluye análisis de patrones personales cuando es relevante.
-        
+        Ahora incluye análisis de patrones personales y análisis NLP avanzado.
+
         Returns:
             Dict con 'respuesta', 'context_extracted', 'pattern_insights' y otros metadatos
         """
-        # Analizar el contexto del mensaje
-        extracted_context = self.analyze_message_context(mensaje_usuario)
+        # Preparar historial conversacional para análisis NLP
+        conversation_history = []
+        if contexto_reciente:
+            conversation_history = [conv.get('mensaje_usuario', '') for conv in contexto_reciente[-5:]]
+
+        # Analizar el contexto del mensaje (ahora con NLP avanzado)
+        extracted_context = self.analyze_message_context(mensaje_usuario, conversation_history)
         
         # Obtener insights de patrones personales si hay BD disponible
         pattern_insight = ""
@@ -266,7 +340,9 @@ Sos un espejo empático que ayuda a {usuario_nombre} a verse con más claridad y
                     usuario_nombre,
                     contexto_reciente,
                     extracted_context,
-                    pattern_insight  # Pasar el insight al modelo
+                    pattern_insight,  # Pasar el insight al modelo
+                    db_session,  # Pasar sesión para contexto histórico
+                    usuario_id  # Pasar ID para contexto histórico
                 )
                 print(f"✅ Respuesta de Claude generada exitosamente")
             except Exception as e:
@@ -300,24 +376,51 @@ Sos un espejo empático que ayuda a {usuario_nombre} a verse con más claridad y
         usuario_nombre: str,
         contexto_reciente: List[Dict] = None,
         extracted_context: Dict = None,
-        pattern_insight: str = ""  # Nuevo parámetro
+        pattern_insight: str = "",  # Nuevo parámetro
+        db_session = None,  # Para contexto histórico
+        usuario_id: int = None  # Para contexto histórico
     ) -> str:
         """
         Genera respuesta usando Claude API.
         Ahora incluye insights de patrones personales cuando están disponibles.
         """
-        # Construir el system prompt
-        system_prompt = self.build_system_prompt(usuario_nombre, contexto_reciente)
+        # Construir el system prompt (con contexto histórico si disponible)
+        system_prompt = self.build_system_prompt(usuario_nombre, contexto_reciente, db_session, usuario_id)
         
         # Agregar información del contexto extraído al prompt
         context_info = ""
         if extracted_context:
+            # Información clásica
             if extracted_context.get('mood_level'):
                 context_info += f"\n[INFO: Usuario mencionó nivel de ánimo {extracted_context['mood_level']}/10]"
             if extracted_context.get('habits_mentioned'):
                 context_info += f"\n[INFO: Hábitos detectados: {', '.join(extracted_context['habits_mentioned'])}]"
             if extracted_context.get('emotional_triggers'):
                 context_info += f"\n[INFO: Disparadores emocionales: {', '.join(extracted_context['emotional_triggers'])}]"
+
+            # Información NLP avanzada
+            nlp_data = extracted_context.get('nlp_analysis', {})
+            if nlp_data:
+                sentiment_data = nlp_data.get('sentiment', {})
+                if sentiment_data.get('dominant_emotion'):
+                    context_info += f"\n[SENTIMIENTO: Emoción dominante '{sentiment_data['dominant_emotion']}' (sentimiento general: {sentiment_data.get('overall_sentiment', 0)}, complejidad: {sentiment_data.get('emotional_complexity', 'desconocida')})]"
+
+                entities_data = nlp_data.get('entities', {})
+                if entities_data.get('relationships'):
+                    context_info += f"\n[CONTEXTO RELACIONAL: Personas/relaciones mencionadas: {', '.join(entities_data['relationships'])}]"
+                if entities_data.get('eventos'):
+                    context_info += f"\n[EVENTOS: {', '.join(entities_data['eventos'])}]"
+
+                values_data = nlp_data.get('values_detected', {})
+                if values_data:
+                    top_values = sorted(values_data.items(), key=lambda x: x[1], reverse=True)[:3]
+                    values_str = ', '.join([f"{v[0]} ({v[1]})" for v in top_values])
+                    context_info += f"\n[VALORES DETECTADOS: {values_str}]"
+
+            # Patrones de lenguaje
+            if extracted_context.get('language_patterns'):
+                lp = extracted_context['language_patterns']
+                context_info += f"\n[ESTILO CONVERSACIONAL: Nivel vocabulario {lp.get('vocabulary_level', 'desconocido')}, estructura de oraciones {lp.get('sentence_structure', 'desconocida')}]"
         
         # Agregar insight de patrones si está disponible
         if pattern_insight:
