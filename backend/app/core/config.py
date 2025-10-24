@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str | None = Field(default=None, env="ANTHROPIC_API_KEY")
     WHATSAPP_ACCESS_TOKEN: str | None = Field(default=None, env="WHATSAPP_ACCESS_TOKEN")
     WHATSAPP_VERIFY_TOKEN: str | None = Field(default=None, env="WHATSAPP_VERIFY_TOKEN")
+    WHATSAPP_PHONE_NUMBER_ID: str | None = Field(default=None, env="WHATSAPP_PHONE_NUMBER_ID")
 
     class Config:
         env_file = ".env"

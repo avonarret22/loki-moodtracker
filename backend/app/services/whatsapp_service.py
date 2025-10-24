@@ -16,6 +16,7 @@ class WhatsAppService:
     def __init__(self):
         self.access_token = settings.WHATSAPP_ACCESS_TOKEN
         self.verify_token = settings.WHATSAPP_VERIFY_TOKEN
+        self.phone_number_id = settings.WHATSAPP_PHONE_NUMBER_ID
         self.api_version = "v18.0"
         self.base_url = f"https://graph.facebook.com/{self.api_version}"
         

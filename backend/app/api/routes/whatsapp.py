@@ -114,15 +114,13 @@ async def receive_webhook(request: Request, db: Session = Depends(get_db)):
             pass
         
         # Enviar respuesta por WhatsApp
-        # TODO: Obtener phone_number_id de la configuración
-        # await whatsapp_service.send_message(
-        #     phone_number=phone_number,
-        #     message=ai_response['respuesta'],
-        #     phone_number_id=PHONE_NUMBER_ID
-        # )
+        await whatsapp_service.send_message(
+            phone_number=phone_number,
+            message=ai_response['respuesta'],
+            phone_number_id=whatsapp_service.phone_number_id
+        )
         
-        # Por ahora, solo logeamos la respuesta
-        print(f"Respuesta para {phone_number}: {ai_response['respuesta']}")
+        print(f"Mensaje enviado a {phone_number}: {ai_response['respuesta']}")
         
         return {"status": "ok", "message": "processed"}
         
