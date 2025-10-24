@@ -333,7 +333,7 @@ class AdvancedNLPService:
             sentence_structure = 'short'
 
         # Extraer expresiones recurrentes (frases de 2-3 palabras que aparecen varias veces)
-        phrases = defaultdict(int)
+        phrases = Counter()
         for i in range(len(words) - 2):
             phrase = ' '.join(words[i:i+3])
             if len(phrase.split()) >= 2 and all(word not in stop_words for word in phrase.split()):
