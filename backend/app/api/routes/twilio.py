@@ -76,6 +76,40 @@ async def receive_twilio_webhook(
             )
             usuario = crud.create_usuario(db, usuario=usuario_data)
         
+        # COMANDO ESPECIAL: Dashboard
+        message_lower = message_text.lower().strip()
+        dashboard_keywords = ['dashboard', 'ver mi progreso', 'estadisticas', 'mis datos', 'mi dashboard']
+        
+        if any(keyword in message_lower for keyword in dashboard_keywords):
+            # Generar link al dashboard
+            from app.services.auth_service import auth_service
+            dashboard_link = auth_service.generate_dashboard_link(
+                usuario_id=usuario.id,
+                telefono=usuario.telefono
+            )
+            
+            dashboard_message = f"""🎯 *Aquí está tu dashboard personal*
+
+Haz clic en este link para ver tu progreso:
+{dashboard_link}
+
+✨ Podrás ver:
+• 📊 Gráficas de tu estado de ánimo
+• 📈 Análisis de patrones emocionales
+• 💪 Progreso de tus hábitos
+• 💬 Historial de conversaciones
+
+El link es válido por 24 horas."""
+
+            # Enviar link por WhatsApp
+            result = await twilio_service.send_message(
+                phone_number=phone_number,
+                message=dashboard_message
+            )
+            
+            print(f"📊 Dashboard link enviado a {phone_number}")
+            return {"status": "ok", "message": "dashboard_sent"}
+        
         # Obtener conversaciones recientes para contexto
         conversaciones_recientes = crud.get_conversaciones_by_usuario(
             db, usuario_id=usuario.id, limit=5

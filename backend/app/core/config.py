@@ -18,6 +18,17 @@ class Settings(BaseSettings):
         "sqlite:///./moodtracker.db",
         env="DATABASE_URL",
     )
+    
+    # Authentication & Security
+    SECRET_KEY: str = Field(
+        "loki-super-secret-key-change-in-production-please",
+        env="SECRET_KEY"
+    )
+    DASHBOARD_URL: str = Field(
+        "http://localhost:3000",
+        env="DASHBOARD_URL"
+    )
+    
     OPENAI_API_KEY: str | None = Field(default=None, env="OPENAI_API_KEY")
     ANTHROPIC_API_KEY: str | None = Field(default=None, env="ANTHROPIC_API_KEY")
     

@@ -7,6 +7,7 @@ from app.api.routes.habits import router as habits_router
 from app.api.routes.analytics import router as analytics_router
 from app.api.routes.whatsapp import router as whatsapp_router
 from app.api.routes.twilio import router as twilio_router  # Twilio WhatsApp
+from app.api.routes.auth import router as auth_router  # Authentication
 from app.api.routes.chat import router as chat_router
 from app.api.routes.patterns import router as patterns_router
 from app.core.config import settings
@@ -36,6 +37,7 @@ def create_app() -> FastAPI:
 
     # Include routers
     app.include_router(health_router, prefix="/health", tags=["health"])
+    app.include_router(auth_router, prefix=settings.API_V1_STR + "/auth", tags=["authentication"])
     app.include_router(mood_router, prefix=settings.API_V1_STR, tags=["mood"])
     app.include_router(habits_router, prefix=settings.API_V1_STR, tags=["habits"])
     app.include_router(analytics_router, prefix=settings.API_V1_STR, tags=["analytics"])
