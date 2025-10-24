@@ -124,5 +124,12 @@ class TwilioWhatsAppService:
             }
 
 
-# Instancia global del servicio
-twilio_service = TwilioWhatsAppService()
+# Instancia global del servicio (solo si Twilio está disponible)
+if TWILIO_AVAILABLE:
+    try:
+        twilio_service = TwilioWhatsAppService()
+    except Exception as e:
+        logger.error(f"❌ Error creando instancia de Twilio service: {e}")
+        twilio_service = None
+else:
+    twilio_service = None

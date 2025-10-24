@@ -29,6 +29,12 @@ async def receive_twilio_webhook(
     
     Twilio envía datos como form-data, no JSON.
     """
+    
+    # Verificar que Twilio service esté disponible
+    if twilio_service is None:
+        print("❌ Twilio service not available - twilio package not installed")
+        return {"status": "error", "message": "Twilio service not configured"}
+    
     try:
         # Construir body dict desde form data
         body = {
