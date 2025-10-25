@@ -85,7 +85,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-purple-50 to-pink-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
       </div>
     );
@@ -138,12 +138,12 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-purple-50 via-pink-50 to-orange-50">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-orange-50">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-linear-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
                 <span className="text-2xl">🤖</span>
               </div>
               <div>
@@ -162,7 +162,7 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8 bg-linear-to-r from-purple-600 to-pink-600 rounded-2xl p-8 text-white shadow-lg">
+        <div className="mb-8 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl p-8 text-white shadow-lg">
           <h2 className="text-3xl font-bold mb-2">
             ¡Hola, {userData.nombre}! 👋
           </h2>
@@ -221,7 +221,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-shadow bg-linear-to-br from-purple-50 to-pink-50 border-purple-200">
+          <Card className="hover:shadow-lg transition-shadow bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
             <CardHeader className="pb-3">
               <CardDescription>Nivel de confianza</CardDescription>
               <CardTitle className="text-4xl text-purple-600">{trustLevel.nivel_confianza}/5</CardTitle>
@@ -308,7 +308,7 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        <Card className="bg-linear-to-br from-purple-100 to-pink-100 border-purple-200">
+        <Card className="bg-gradient-to-br from-purple-100 to-pink-100 border-purple-200">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <span>🚧</span>
