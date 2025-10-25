@@ -2,9 +2,19 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+const MoodTrendChart = dynamic(() => import('@/components/charts').then(mod => mod.MoodTrendChart), {
+  ssr: false,
+  loading: () => <div className="h-[250px] flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div></div>
+});
+
+const ActivitiesChart = dynamic(() => import('@/components/charts').then(mod => mod.ActivitiesChart), {
+  ssr: false,
+  loading: () => <div className="h-[250px] flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-600"></div></div>
+});
 
 interface MoodData {
   timestamp: string;
@@ -65,7 +75,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-purple-50 to-pink-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
       </div>
     );
@@ -110,12 +120,12 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-orange-50">
+    <div className="min-h-screen bg-linear-to-br from-purple-50 via-pink-50 to-orange-50">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+              <div className="w-10 h-10 bg-linear-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
                 <span className="text-2xl">🤖</span>
               </div>
               <div>
@@ -134,7 +144,7 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl p-8 text-white shadow-lg">
+        <div className="mb-8 bg-linear-to-r from-purple-600 to-pink-600 rounded-2xl p-8 text-white shadow-lg">
           <h2 className="text-3xl font-bold mb-2">
             ¡Hola, Usuario {userData.id}! 👋
           </h2>
@@ -193,21 +203,7 @@ export default function DashboardPage() {
               <CardDescription>Últimos 7 días</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <AreaChart data={weeklyTrend}>
-                  <defs>
-                    <linearGradient id="colorMood" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="day" />
-                  <YAxis domain={[0, 10]} />
-                  <Tooltip />
-                  <Area type="monotone" dataKey="mood" stroke="#8b5cf6" fillOpacity={1} fill="url(#colorMood)" />
-                </AreaChart>
-              </ResponsiveContainer>
+              <MoodTrendChart data={weeklyTrend} />
             </CardContent>
           </Card>
 
@@ -217,15 +213,7 @@ export default function DashboardPage() {
               <CardDescription>Hábitos y check-ins semanales</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={weeklyTrend}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="day" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="activities" fill="#ec4899" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <ActivitiesChart data={weeklyTrend} />
             </CardContent>
           </Card>
         </div>
@@ -266,7 +254,7 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        <Card className="bg-gradient-to-br from-purple-100 to-pink-100 border-purple-200">
+        <Card className="bg-linear-to-br from-purple-100 to-pink-100 border-purple-200">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <span>🚧</span>
