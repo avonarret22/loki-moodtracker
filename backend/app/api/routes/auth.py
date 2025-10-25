@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from app.db.session import get_db
 from app.services.auth_service import auth_service
+from app.services.trust_level_service import trust_service
 from app.crud import mood as crud
 
 router = APIRouter()
@@ -116,35 +117,56 @@ async def get_current_user(
 ):
     """
     Obtiene información del usuario actual basado en el token.
-    
+
     Args:
         token: Token JWT del usuario
-        
+
     Returns:
-        Información completa del usuario
+        Información completa del usuario incluyendo moods y trust level
     """
     token_data = auth_service.verify_token(token)
-    
+
     if not token_data:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido o expirado"
         )
-    
+
     usuario_id = token_data.get('usuario_id')
     usuario = crud.get_usuario(db, usuario_id=usuario_id)
-    
+
     if not usuario:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Usuario no encontrado"
         )
-    
+
+    # Obtener estados de ánimo del usuario
+    estados_animo = crud.get_estados_animo_by_usuario(db, usuario_id=usuario_id, limit=100)
+    moods = [
+        {
+            "timestamp": estado.timestamp.isoformat() if estado.timestamp else None,
+            "nivel": estado.nivel,
+            "notas_texto": estado.notas_texto
+        }
+        for estado in estados_animo
+    ]
+
+    # Obtener información del nivel de confianza
+    trust_info = trust_service.get_user_trust_info(db, usuario_id)
+
     return {
         "id": usuario.id,
         "nombre": usuario.nombre,
         "telefono": usuario.telefono,
-        "fecha_registro": usuario.fecha_registro,
+        "fecha_registro": usuario.fecha_registro.isoformat() if usuario.fecha_registro else None,
         "nivel_CMV": usuario.nivel_CMV,
-        "frecuencia_checkins": usuario.frecuencia_checkins
+        "frecuencia_checkins": usuario.frecuencia_checkins,
+        "moods": moods,
+        "trust_level": trust_info if trust_info else {
+            "nivel_confianza": 1,
+            "total_interacciones": 0,
+            "nivel_nombre": "Conociendo",
+            "mensajes_hasta_siguiente_nivel": 10
+        }
     }

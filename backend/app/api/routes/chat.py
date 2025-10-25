@@ -11,6 +11,7 @@ import json
 from app.db.session import get_db
 from app import crud, schemas
 from app.services.ai_service import loki_service
+from app.services.trust_level_service import trust_service
 
 router = APIRouter()
 
@@ -56,6 +57,11 @@ async def chat_with_loki(chat_msg: ChatMessage, db: Session = Depends(get_db)):
         for conv in conversaciones_recientes
     ]
     
+    # Actualizar nivel de confianza (incrementa contador de interacciones)
+    trust_update = trust_service.update_trust_level(db, usuario.id)
+    if trust_update.get('nivel_cambio'):
+        print(f"🎉 ¡Nivel de confianza aumentó! Ahora: {trust_update['nivel_info']['name']}")
+
     # Generar respuesta con Loki AI (ahora con análisis de patrones)
     ai_response = await loki_service.generate_response(
         mensaje_usuario=chat_msg.mensaje,
@@ -64,7 +70,7 @@ async def chat_with_loki(chat_msg: ChatMessage, db: Session = Depends(get_db)):
         db_session=db,  # Pasar sesión de BD para análisis de patrones
         usuario_id=usuario.id  # Pasar ID de usuario
     )
-    
+
     # Guardar la conversación
     conversacion_data = schemas.ConversacionContextoCreate(
         mensaje_usuario=chat_msg.mensaje,

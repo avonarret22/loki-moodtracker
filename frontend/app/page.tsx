@@ -1,6 +1,6 @@
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400">
+    <div className="min-h-screen bg-linear-to-br from-purple-600 via-pink-500 to-orange-400">
       <div className="container mx-auto px-4 py-16">
         <div className="max-w-4xl mx-auto text-center text-white">
           {/* Logo/Hero */}

@@ -11,19 +11,19 @@ function AuthContent() {
   const [message, setMessage] = useState('Verificando tu acceso...');
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    
-    if (!token) {
-      setStatus('error');
-      setMessage('No se proporcionó un token de acceso');
-      return;
-    }
-
     // Verificar el token con el backend
-    const verifyToken = async (token: string) => {
+    const verifyToken = async () => {
+      const token = searchParams.get('token');
+
+      if (!token) {
+        setStatus('error');
+        setMessage('No se proporcionó un token de acceso');
+        return;
+      }
+
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-        
+
         const response = await fetch(`${apiUrl}/api/v1/auth/verify-token`, {
           method: 'POST',
           headers: {
@@ -41,10 +41,10 @@ function AuthContent() {
             usuario_id: data.usuario_id,
             telefono: data.telefono,
           }));
-          
+
           setStatus('success');
           setMessage('¡Acceso verificado! Redirigiendo...');
-          
+
           // Redirigir al dashboard después de 1 segundo
           setTimeout(() => {
             router.push('/dashboard');
@@ -60,16 +60,16 @@ function AuthContent() {
       }
     };
 
-    verifyToken(token);
+    verifyToken();
   }, [searchParams, router]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-linear-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
         <div className="text-center">
           {/* Logo/Icon */}
           <div className="mb-6">
-            <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full mx-auto flex items-center justify-center">
+            <div className="w-20 h-20 bg-linear-to-br from-purple-500 to-pink-500 rounded-full mx-auto flex items-center justify-center">
               <span className="text-4xl">🤖</span>
             </div>
           </div>
@@ -122,7 +122,7 @@ function AuthContent() {
 export default function AuthPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-linear-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>

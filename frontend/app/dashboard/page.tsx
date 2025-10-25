@@ -22,6 +22,15 @@ interface MoodData {
   notas_texto?: string;
 }
 
+interface TrustLevel {
+  nivel_confianza: number;
+  total_interacciones: number;
+  nivel_nombre: string;
+  nivel_descripcion?: string;
+  mensajes_hasta_siguiente_nivel: number;
+  es_nivel_maximo?: boolean;
+}
+
 interface UserData {
   id: number;
   nombre: string;
@@ -30,6 +39,7 @@ interface UserData {
   nivel_CMV?: number;
   frecuencia_checkins?: string;
   moods?: MoodData[];
+  trust_level?: TrustLevel;
 }
 
 export default function DashboardPage() {
@@ -86,13 +96,21 @@ export default function DashboardPage() {
   }
 
   const moods = userData.moods || [];
-  const avgMood = moods.length > 0 
+  const avgMood = moods.length > 0
     ? (moods.reduce((sum, m) => sum + m.nivel, 0) / moods.length).toFixed(1)
     : 'N/A';
-  
-  const daysActive = Math.floor(
-    (Date.now() - new Date(userData.fecha_registro).getTime()) / (1000 * 60 * 60 * 24)
-  );
+
+  // Calcular días activo (asegurarse de que no sea negativo)
+  const daysActive = userData.fecha_registro
+    ? Math.max(0, Math.floor((Date.now() - new Date(userData.fecha_registro).getTime()) / (1000 * 60 * 60 * 24)))
+    : 0;
+
+  const trustLevel = userData.trust_level || {
+    nivel_confianza: 1,
+    total_interacciones: 0,
+    nivel_nombre: "Conociendo",
+    mensajes_hasta_siguiente_nivel: 10
+  };
 
   const weeklyTrend = [
     { day: 'Lun', mood: 7, activities: 3 },
@@ -146,14 +164,22 @@ export default function DashboardPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8 bg-linear-to-r from-purple-600 to-pink-600 rounded-2xl p-8 text-white shadow-lg">
           <h2 className="text-3xl font-bold mb-2">
-            ¡Hola, Usuario {userData.id}! 👋
+            ¡Hola, {userData.nombre}! 👋
           </h2>
           <p className="text-purple-100 text-lg">
             Bienvenido a tu dashboard personal de bienestar emocional
           </p>
+          <div className="mt-4 flex items-center space-x-2">
+            <Badge className="bg-white/20 text-white border-white/30 hover:bg-white/30">
+              Nivel de confianza: {trustLevel.nivel_nombre}
+            </Badge>
+            <Badge className="bg-white/20 text-white border-white/30 hover:bg-white/30">
+              {trustLevel.total_interacciones} conversaciones
+            </Badge>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader className="pb-3">
               <CardDescription>Estado promedio</CardDescription>
@@ -192,6 +218,34 @@ export default function DashboardPage() {
                 <p className="text-sm text-gray-600">Desde que te registraste</p>
                 <span className="text-3xl">🔥</span>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow bg-linear-to-br from-purple-50 to-pink-50 border-purple-200">
+            <CardHeader className="pb-3">
+              <CardDescription>Nivel de confianza</CardDescription>
+              <CardTitle className="text-4xl text-purple-600">{trustLevel.nivel_confianza}/5</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-600">{trustLevel.nivel_nombre}</p>
+                <span className="text-3xl">🤝</span>
+              </div>
+              {!trustLevel.es_nivel_maximo && trustLevel.mensajes_hasta_siguiente_nivel > 0 && (
+                <div className="mt-2">
+                  <div className="w-full bg-purple-200 rounded-full h-2">
+                    <div
+                      className="bg-purple-600 h-2 rounded-full transition-all"
+                      style={{
+                        width: `${Math.min(100, ((10 - trustLevel.mensajes_hasta_siguiente_nivel) / 10) * 100)}%`
+                      }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {trustLevel.mensajes_hasta_siguiente_nivel} mensajes para siguiente nivel
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

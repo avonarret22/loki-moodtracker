@@ -31,32 +31,40 @@ class WhatsAppService:
     def parse_webhook_message(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Parsea el mensaje recibido del webhook de WhatsApp.
-        
+
         Returns:
-            Dict con 'phone_number', 'message_text', 'message_id', 'timestamp'
+            Dict con 'phone_number', 'message_text', 'message_id', 'timestamp', 'profile_name'
             o None si no es un mensaje válido.
         """
         try:
             entry = data.get('entry', [{}])[0]
             changes = entry.get('changes', [{}])[0]
             value = changes.get('value', {})
-            
+
             # Verificar que hay mensajes
             messages = value.get('messages', [])
             if not messages:
                 return None
-            
+
             message = messages[0]
-            
+
             # Solo procesar mensajes de texto por ahora
             if message.get('type') != 'text':
                 return None
-            
+
+            # Extraer información del contacto si está disponible
+            contacts = value.get('contacts', [])
+            profile_name = None
+            if contacts:
+                profile = contacts[0].get('profile', {})
+                profile_name = profile.get('name')
+
             return {
                 'phone_number': message.get('from'),
                 'message_text': message.get('text', {}).get('body', ''),
                 'message_id': message.get('id'),
                 'timestamp': message.get('timestamp'),
+                'profile_name': profile_name  # Nombre del perfil de WhatsApp
             }
         except (KeyError, IndexError) as e:
             print(f"Error parsing webhook message: {e}")

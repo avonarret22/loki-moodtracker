@@ -11,6 +11,7 @@ from app.db.session import get_db
 from app import crud, schemas
 from app.services.whatsapp_service import whatsapp_service
 from app.services.ai_service import loki_service
+from app.services.trust_level_service import trust_service
 
 router = APIRouter()
 
@@ -57,22 +58,34 @@ async def receive_webhook(request: Request, db: Session = Depends(get_db)):
         phone_number = parsed_message['phone_number']
         message_text = parsed_message['message_text']
         message_id = parsed_message['message_id']
-        
+        profile_name = parsed_message.get('profile_name')
+
         print(f"📱 Mensaje parseado:")
         print(f"   Número: {phone_number}")
+        print(f"   Nombre: {profile_name or 'No disponible'}")
         print(f"   Texto: {message_text}")
         print(f"   ID: {message_id}")
-        
+
         # Buscar o crear usuario basado en el número de teléfono
         usuario = crud.get_usuario_by_telefono(db, telefono=phone_number)
-        
+
         if not usuario:
             # Crear nuevo usuario si es la primera vez que escribe
+            # Usar nombre del perfil de WhatsApp si está disponible
+            nombre_usuario = profile_name if profile_name else "Usuario de WhatsApp"
+
             usuario_data = schemas.UsuarioCreate(
-                nombre=f"Usuario {phone_number[-4:]}",  # Nombre temporal
+                nombre=nombre_usuario,
                 telefono=phone_number
             )
             usuario = crud.create_usuario(db, usuario=usuario_data)
+            print(f"✅ Nuevo usuario creado: {nombre_usuario} ({phone_number})")
+        elif profile_name and usuario.nombre != profile_name and usuario.nombre.startswith("Usuario"):
+            # Actualizar nombre si tenemos el nombre del perfil y el actual es temporal
+            usuario.nombre = profile_name
+            db.commit()
+            db.refresh(usuario)
+            print(f"✅ Nombre de usuario actualizado a: {profile_name}")
         
         # Obtener conversaciones recientes para contexto
         conversaciones_recientes = crud.get_conversaciones_by_usuario(
@@ -86,12 +99,19 @@ async def receive_webhook(request: Request, db: Session = Depends(get_db)):
             }
             for conv in conversaciones_recientes
         ]
-        
+
+        # Actualizar nivel de confianza (incrementa contador de interacciones)
+        trust_update = trust_service.update_trust_level(db, usuario.id)
+        if trust_update.get('nivel_cambio'):
+            print(f"🎉 ¡Nivel de confianza aumentó! Ahora: {trust_update['nivel_info']['name']}")
+
         # Generar respuesta con Loki AI
         ai_response = await loki_service.generate_response(
             mensaje_usuario=message_text,
             usuario_nombre=usuario.nombre,
-            contexto_reciente=contexto_reciente
+            contexto_reciente=contexto_reciente,
+            db_session=db,
+            usuario_id=usuario.id
         )
         
         # Guardar la conversación

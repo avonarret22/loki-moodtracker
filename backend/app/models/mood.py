@@ -16,6 +16,10 @@ class Usuario(Base):
     frecuencia_checkins = Column(String, default='diaria')
     fecha_registro = Column(DateTime, default=datetime.datetime.utcnow)
 
+    # Sistema de niveles de confianza
+    nivel_confianza = Column(Integer, default=1)  # 1-5: Conociendo, Estableciendo, Construyendo, Consolidado, Íntimo
+    total_interacciones = Column(Integer, default=0)  # Contador de mensajes intercambiados
+
     # Relationships
     estados_animo = relationship("EstadoAnimo", back_populates="usuario", cascade="all, delete-orphan")
     habitos = relationship("Habito", back_populates="usuario", cascade="all, delete-orphan")

@@ -12,6 +12,7 @@ from anthropic import Anthropic
 from app.core.config import settings
 from app.services.nlp_service import nlp_service
 from app.services.memory_service import memory_service
+from app.services.trust_level_service import trust_service
 
 
 class LokiAIService:
@@ -44,66 +45,181 @@ class LokiAIService:
             self.claude_client = None
             print("⚠️ Claude API key no encontrada, usando respuestas basadas en reglas")
         
+    def _get_trust_based_system_prompt(self, usuario_nombre: str, nivel_confianza: int, nivel_info: Dict) -> str:
+        """
+        Prompt adaptado según el nivel de confianza con el usuario.
+        Elimina frases cursis y adapta el tono de reservado a cercano.
+
+        Args:
+            usuario_nombre: Nombre del usuario
+            nivel_confianza: Nivel de confianza (1-5)
+            nivel_info: Información del nivel de confianza
+        """
+        # Frases prohibidas que NUNCA debe usar
+        forbidden = trust_service.get_forbidden_phrases()
+        forbidden_str = "', '".join(forbidden)
+
+        # Base común para todos los niveles
+        base_prompt = f"""Eres Loki, un compañero en el bienestar emocional de {usuario_nombre}.
+
+PERSONALIDAD BASE:
+- Natural, conversacional, sin poses terapéuticas
+- Curioso pero no invasivo
+- Valida sin exagerar
+- Pregunta más que explica
+
+PROHIBIDO USAR estas frases cursis:
+'{forbidden_str}'
+
+NIVEL DE CONFIANZA ACTUAL: {nivel_info['name']} ({nivel_confianza}/5)
+"""
+
+        # Prompts específicos por nivel de confianza
+        level_prompts = {
+            1: f"""ETAPA: Conociendo a {usuario_nombre} ({nivel_info['description']})
+
+TONO: {nivel_info['tone']}
+ENFOQUE: {nivel_info['approach']}
+RESPUESTAS: {nivel_info['max_sentences']} oración máximo
+
+GUÍAS:
+- Preguntas simples y directas
+- No asumas nada sobre la persona
+- Educado pero no formal
+- NO hagas afirmaciones sobre su vida
+- Solo escucha y pregunta para entender
+
+Ejemplos:
+✅ "¿Cómo estuvo tu día?"
+✅ "Cuéntame más"
+✅ "¿Qué pasó?"
+❌ "Sé que esto debe ser difícil para ti"
+❌ "Entiendo perfectamente cómo te sientes"
+""",
+            2: f"""ETAPA: Estableciendo relación con {usuario_nombre} ({nivel_info['description']})
+
+TONO: {nivel_info['tone']}
+ENFOQUE: {nivel_info['approach']}
+RESPUESTAS: Máximo {nivel_info['max_sentences']} oraciones
+
+GUÍAS:
+- Empieza a recordar cosas que mencionó antes
+- Conecta conversaciones pasadas
+- Menos formal, más natural
+- Puedes hacer conexiones simples
+- Sigue siendo breve
+
+Ejemplos:
+✅ "Ayer mencionaste X. ¿Sigue pasando?"
+✅ "¿Esto te pasa seguido?"
+✅ "Tiene sentido"
+❌ "Como siempre, estoy aquí para ti"
+❌ "Siento mucho que estés pasando por esto"
+""",
+            3: f"""ETAPA: Construyendo confianza con {usuario_nombre} ({nivel_info['description']})
+
+TONO: {nivel_info['tone']}
+ENFOQUE: {nivel_info['approach']}
+RESPUESTAS: Máximo {nivel_info['max_sentences']} oraciones
+
+GUÍAS:
+- Identifica y señala patrones
+- Sugiere conexiones entre eventos y emociones
+- Más proactivo en observaciones
+- Recuerda y referencia conversaciones previas
+- Puedes ser más directo
+
+Ejemplos:
+✅ "Noto que cuando X pasa, sueles sentir Y"
+✅ "Esto se parece a lo de la semana pasada"
+✅ "¿Ves alguna conexión?"
+❌ "Estoy orgulloso de tu progreso"
+❌ "Quiero que sepas que valoro tu confianza"
+""",
+            4: f"""ETAPA: Relación consolidada con {usuario_nombre} ({nivel_info['description']})
+
+TONO: {nivel_info['tone']}
+ENFOQUE: {nivel_info['approach']}
+RESPUESTAS: Máximo {nivel_info['max_sentences']} oraciones (solo si es necesario)
+
+GUÍAS:
+- Lee entre líneas
+- Usa humor cuando sea apropiado
+- Referencia momentos compartidos
+- Puedes desafiar constructivamente
+- Sé honesto, no solo validante
+
+Ejemplos:
+✅ "Esto no es típico en ti. ¿Qué cambió?"
+✅ "¿Y si probamos lo que funcionó la última vez?"
+✅ "Conociéndote, sospecho que hay más"
+❌ "Siempre admiro tu fortaleza"
+❌ "Nuestro vínculo es muy especial"
+""",
+            5: f"""ETAPA: Confianza profunda con {usuario_nombre} ({nivel_info['description']})
+
+TONO: {nivel_info['tone']}
+ENFOQUE: {nivel_info['approach']}
+RESPUESTAS: Variable según necesidad (usualmente breve)
+
+GUÍAS:
+- Totalmente directo y honesto
+- Anticipa lo que no dicen
+- Desafía cuando es necesario
+- Usa referencias internas (bromas, momentos compartidos)
+- Menos es más: a veces una palabra basta
+
+Ejemplos:
+✅ "Ya sabes qué hacer, ¿verdad?"
+✅ "¿A quién estás tratando de convencer?"
+✅ "Seamos honestos"
+✅ "Esto no es sobre X. Es sobre Y"
+❌ "Nuestra conexión es profunda"
+❌ "Me siento honrado de ser tu apoyo"
+"""
+        }
+
+        return base_prompt + level_prompts.get(nivel_confianza, level_prompts[1])
+
     def _get_concise_system_prompt(self, usuario_nombre: str) -> str:
         """
         Prompt CONCISO para respuestas breves y directas.
-        Perfecto para mantener engagement y no abrumar al usuario.
+        DEPRECATED: Usar _get_trust_based_system_prompt en su lugar.
         """
-        return f"""Eres Loki, un amigo cálido que acompaña a {usuario_nombre} en su bienestar emocional.
-
-REGLAS:
-- Respuestas CORTAS (máximo 2 oraciones)
-- Valida primero, luego pregunta
-- Preguntas simples y directas
-- SIN explicaciones largas
-- Natural, como un amigo
-
-Ejemplo: Si dicen "me siento triste"
-Responde: "Entiendo. ¿Pasó algo hoy?"
-NO: "Noto que hay tristeza en tus palabras. La tristeza es una emoción válida que..."
-
-Tu meta: Que el usuario se sienta escuchado en 30 segundos."""
+        # Fallback al nivel 1 si no tenemos info de confianza
+        nivel_info = trust_service.get_trust_level_info(1)
+        return self._get_trust_based_system_prompt(usuario_nombre, 1, nivel_info)
 
     def _get_deep_system_prompt(self, usuario_nombre: str) -> str:
         """
         Prompt PROFUNDO para análisis y exploración detallada.
-        Se usa solo si el usuario pide profundizar.
+        DEPRECATED: El sistema de niveles de confianza reemplaza esto.
         """
-        return f"""Eres Loki, un asistente de bienestar emocional con la calidez de un amigo cercano
-y la profundidad de un psicólogo experimentado. Tu especialidad es acompañar a {usuario_nombre} en su
-camino hacia el autoconocimiento emocional y el cultivo de hábitos saludables.
-
-RESPUESTAS: 3-4 oraciones con exploración profunda
-ENFOQUE: Análisis, patrones, conexiones
-PREGUNTAS: Reflexivas, que inviten a profundizar"""
+        # Fallback al nivel 3 para modo profundo
+        nivel_info = trust_service.get_trust_level_info(3)
+        return self._get_trust_based_system_prompt(usuario_nombre, 3, nivel_info)
 
     def build_system_prompt(self, usuario_nombre: str, contexto_reciente: List[Dict] = None, db_session = None, usuario_id: int = None) -> str:
         """
-        Construye el prompt del sistema basado en modo de conversación.
-        'conciso' (default) para respuestas breves y directas
-        'profundo' para análisis más detallado
+        Construye el prompt del sistema basado en el nivel de confianza del usuario.
+        Adapta automáticamente la personalidad según la relación.
         """
-        # Si es modo conciso (default), usar prompt simplificado
-        if self.conversation_mode == 'conciso':
-            return self._get_concise_system_prompt(usuario_nombre)
+        # Obtener nivel de confianza del usuario
+        nivel_confianza = 1
+        nivel_info = trust_service.get_trust_level_info(1)
 
-        # Importar servicios de adaptación si están disponibles (para modo profundo)
-        try:
-            from app.services.personality_adaptation_service import personality_service
-            personality_enhancement = personality_service.generate_adapted_system_prompt_enhancement(
-                db_session, usuario_id, usuario_nombre, None
-            ) if db_session and usuario_id else ""
-        except:
-            personality_enhancement = ""
-
-        prompt = self._get_deep_system_prompt(usuario_nombre)
-
-        # Agregar enhancement de personalidad si está disponible
-        if personality_enhancement:
-            prompt += personality_enhancement
-
-        # Agregar contexto histórico de largo plazo si disponible
         if db_session and usuario_id:
+            trust_info = trust_service.get_user_trust_info(db_session, usuario_id)
+            if trust_info:
+                nivel_confianza = trust_info['nivel_confianza']
+                nivel_info = trust_service.get_trust_level_info(nivel_confianza)
+                print(f"🤝 Nivel de confianza con usuario {usuario_id}: {nivel_info['name']} ({nivel_confianza}/5) - {trust_info['total_interacciones']} interacciones")
+
+        # Construir prompt base según nivel de confianza
+        prompt = self._get_trust_based_system_prompt(usuario_nombre, nivel_confianza, nivel_info)
+
+        # Agregar contexto histórico de largo plazo solo si el nivel de confianza es alto (3+)
+        if db_session and usuario_id and nivel_confianza >= 3:
             try:
                 long_term_context = memory_service.get_long_term_context(db_session, usuario_id)
                 if long_term_context:
@@ -111,10 +227,12 @@ PREGUNTAS: Reflexivas, que inviten a profundizar"""
             except Exception as e:
                 print(f"⚠️ Error obteniendo contexto histórico: {e}")
 
-        # Agregar contexto reciente
+        # Agregar contexto reciente (últimas conversaciones)
         if contexto_reciente:
+            # Cantidad de contexto depende del nivel de confianza
+            context_window = min(nivel_confianza + 1, 5)  # Nivel 1: 2 msgs, Nivel 5: 6 msgs
             prompt += f"\n\n### CONVERSACIONES RECIENTES:\n"
-            for conv in contexto_reciente[-3:]:  # Últimas 3 conversaciones (no 5)
+            for conv in contexto_reciente[-context_window:]:
                 prompt += f"Usuario: {conv.get('mensaje_usuario', '')}\n"
                 prompt += f"Tú: {conv.get('respuesta_loki', '')}\n\n"
 
