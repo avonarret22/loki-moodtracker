@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from app.db.session import get_db
 from app.services.auth_service import auth_service
-from app.db import crud
+from app.crud import mood as crud
 
 router = APIRouter()
 
