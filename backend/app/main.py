@@ -1,5 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from app.api.routes.health import router as health_router
 from app.api.routes.mood import router as mood_router
@@ -11,8 +14,11 @@ from app.api.routes.auth import router as auth_router  # Authentication
 from app.api.routes.chat import router as chat_router
 from app.api.routes.patterns import router as patterns_router
 from app.core.config import settings
+from app.core.logger import setup_logger
 from app.db.session import engine
 from app.models import mood
+
+logger = setup_logger(__name__)
 
 
 def create_app() -> FastAPI:
@@ -23,13 +29,18 @@ def create_app() -> FastAPI:
         description="API for Loki, the WhatsApp-based emotional companion",
     )
 
-    # Configurar CORS para permitir el frontend
+    # Configurar rate limiting
+    limiter = Limiter(key_func=get_remote_address)
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    # Configurar CORS de forma restrictiva
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # En producción, especificar los dominios permitidos
+        allow_origins=settings.CORS_ORIGINS,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
+        allow_headers=["Authorization", "Content-Type"],
     )
 
     # Crear las tablas en la base de datos

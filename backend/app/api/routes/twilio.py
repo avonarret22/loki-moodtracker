@@ -5,17 +5,23 @@ Recibe mensajes entrantes y responde con la IA de Loki.
 
 from fastapi import APIRouter, Request, Form, Depends
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 import json
 
 from app.db.session import get_db
 from app import crud, schemas
 from app.services.twilio_service import twilio_service
 from app.services.ai_service import loki_service
+from app.core.logger import setup_logger
 
+logger = setup_logger(__name__)
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/webhook")
+@limiter.limit("100/minute")  # Máximo 100 requests por minuto por IP
 async def receive_twilio_webhook(
     request: Request,
     db: Session = Depends(get_db),
@@ -32,9 +38,9 @@ async def receive_twilio_webhook(
     
     # Verificar que Twilio service esté disponible
     if twilio_service is None:
-        print("❌ Twilio service not available - twilio package not installed")
+        logger.error("Twilio service not available - twilio package not installed")
         return {"status": "error", "message": "Twilio service not configured"}
-    
+
     try:
         # Construir body dict desde form data
         body = {
@@ -42,11 +48,10 @@ async def receive_twilio_webhook(
             'From': From,
             'MessageSid': MessageSid
         }
-        
-        print(f"📥 Webhook de Twilio recibido:")
-        print(f"   From: {From}")
-        print(f"   Message: {Body}")
-        print(f"   SID: {MessageSid}")
+
+        logger.info(f"Webhook de Twilio recibido desde {From}")
+        logger.debug(f"Mensaje: {Body}")
+        logger.debug(f"SID: {MessageSid}")
         
         # Parsear el mensaje
         parsed_message = twilio_service.parse_webhook_message(body)

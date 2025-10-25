@@ -4,8 +4,13 @@ Maneja webhooks entrantes y envío de mensajes.
 """
 
 from typing import Dict, Any, Optional
+import hmac
+import hashlib
 import httpx
 from app.core.config import settings
+from app.core.logger import setup_logger, log_security_event
+
+logger = setup_logger(__name__)
 
 
 class WhatsAppService:
@@ -25,8 +30,49 @@ class WhatsAppService:
         Verifica el webhook de WhatsApp durante la configuración inicial.
         """
         if mode == "subscribe" and token == self.verify_token:
+            logger.info("Webhook verificado correctamente")
             return challenge
+        log_security_event(logger, "webhook_verification_failed", f"mode={mode}", "WARNING")
         return None
+
+    def verify_webhook_signature(self, payload: str, signature: str) -> bool:
+        """
+        Verifica la firma X-Hub-Signature-256 del webhook de Meta.
+
+        Args:
+            payload: Body del request como string
+            signature: Header X-Hub-Signature-256
+
+        Returns:
+            True si la firma es válida, False si no
+        """
+        if not self.verify_token:
+            logger.warning("WHATSAPP_VERIFY_TOKEN no configurado, no se puede verificar firma")
+            return False
+
+        if not signature:
+            log_security_event(logger, "missing_webhook_signature", "No signature provided", "WARNING")
+            return False
+
+        # Calcular firma esperada
+        expected_signature = "sha256=" + hmac.new(
+            self.verify_token.encode(),
+            payload.encode(),
+            hashlib.sha256
+        ).hexdigest()
+
+        # Comparación segura contra timing attacks
+        is_valid = hmac.compare_digest(expected_signature, signature)
+
+        if not is_valid:
+            log_security_event(
+                logger,
+                "invalid_webhook_signature",
+                "Firma inválida en webhook",
+                "CRITICAL"
+            )
+
+        return is_valid
     
     def parse_webhook_message(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
@@ -67,7 +113,7 @@ class WhatsAppService:
                 'profile_name': profile_name  # Nombre del perfil de WhatsApp
             }
         except (KeyError, IndexError) as e:
-            print(f"Error parsing webhook message: {e}")
+            logger.error(f"Error parsing webhook message: {e}")
             return None
     
     async def send_message(
@@ -88,12 +134,12 @@ class WhatsAppService:
             Respuesta de la API de WhatsApp
         """
         if not self.access_token:
-            print("WhatsApp Access Token no configurado")
+            logger.error("WhatsApp Access Token no configurado")
             return {"error": "WhatsApp not configured"}
-        
+
         if not phone_number_id:
             # Este valor debe ser obtenido de la configuración de WhatsApp Business
-            print("Phone Number ID no configurado")
+            logger.error("Phone Number ID no configurado")
             return {"error": "Phone number ID not configured"}
         
         url = f"{self.base_url}/{phone_number_id}/messages"
@@ -112,21 +158,19 @@ class WhatsAppService:
             }
         }
         
-        print(f"📤 Enviando mensaje a WhatsApp:")
-        print(f"   URL: {url}")
-        print(f"   To: {phone_number}")
-        print(f"   Message: {message[:50]}...")
-        
+        logger.info(f"Enviando mensaje WhatsApp a {phone_number}")
+        logger.debug(f"Mensaje: {message[:100]}...")
+
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(url, json=payload, headers=headers)
                 response.raise_for_status()
-                print(f"✅ Mensaje enviado exitosamente")
+                logger.info(f"Mensaje enviado exitosamente a {phone_number}")
                 return response.json()
         except httpx.HTTPError as e:
-            print(f"❌ Error sending WhatsApp message: {e}")
+            logger.error(f"Error sending WhatsApp message: {e}")
             if hasattr(e, 'response') and e.response is not None:
-                print(f"   Response body: {e.response.text}")
+                logger.error(f"Response body: {e.response.text}")
             return {"error": str(e)}
     
     async def mark_message_as_read(
@@ -159,7 +203,7 @@ class WhatsAppService:
                 response.raise_for_status()
                 return response.json()
         except httpx.HTTPError as e:
-            print(f"Error marking message as read: {e}")
+            logger.error(f"Error marking message as read: {e}")
             return {"error": str(e)}
 
 

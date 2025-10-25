@@ -20,13 +20,16 @@ class Settings(BaseSettings):
     )
     
     # Authentication & Security
-    SECRET_KEY: str = Field(
-        "loki-super-secret-key-change-in-production-please",
-        env="SECRET_KEY"
-    )
+    SECRET_KEY: str = Field(..., env="SECRET_KEY", min_length=32)
     DASHBOARD_URL: str = Field(
         "http://localhost:3000",
         env="DASHBOARD_URL"
+    )
+
+    # CORS - Allowed origins for frontend
+    CORS_ORIGINS: list[str] = Field(
+        default=["http://localhost:3000"],
+        env="CORS_ORIGINS"
     )
     
     OPENAI_API_KEY: str | None = Field(default=None, env="OPENAI_API_KEY")

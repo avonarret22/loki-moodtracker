@@ -5,14 +5,14 @@ Genera tokens seguros para acceso al dashboard sin password.
 import jwt
 import datetime
 from typing import Optional, Dict
-import logging
 
 from app.core.config import settings
+from app.core.logger import setup_logger, log_security_event
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
-# Secret key para JWT - en producción debe venir de variable de entorno
-JWT_SECRET = settings.SECRET_KEY if hasattr(settings, 'SECRET_KEY') else "loki-secret-key-change-in-production"
+# Secret key para JWT - REQUERIDO en variables de entorno
+JWT_SECRET = settings.SECRET_KEY
 JWT_ALGORITHM = "HS256"
 TOKEN_EXPIRATION_HOURS = 24
 
@@ -44,12 +44,13 @@ class AuthService:
             
             # Generar token
             token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-            
-            logger.info(f"✅ Token generado para usuario {usuario_id}")
+
+            logger.info(f"Token generado para usuario {usuario_id}")
             return token
-            
+
         except Exception as e:
-            logger.error(f"❌ Error generando token: {e}")
+            logger.error(f"Error generando token: {e}")
+            log_security_event(logger, "token_generation_failed", f"usuario_id={usuario_id}", "ERROR")
             raise
     
     @staticmethod
@@ -69,24 +70,25 @@ class AuthService:
             
             # Verificar que es un token de dashboard
             if payload.get('type') != 'dashboard_access':
-                logger.warning("⚠️ Token no es de tipo dashboard_access")
+                log_security_event(logger, "invalid_token_type", f"type={payload.get('type')}", "WARNING")
                 return None
-            
-            logger.info(f"✅ Token verificado para usuario {payload.get('usuario_id')}")
+
+            logger.info(f"Token verificado para usuario {payload.get('usuario_id')}")
             return {
                 'usuario_id': payload.get('usuario_id'),
                 'telefono': payload.get('telefono'),
                 'exp': payload.get('exp')
             }
-            
+
         except jwt.ExpiredSignatureError:
-            logger.warning("⚠️ Token expirado")
+            log_security_event(logger, "expired_token", "Token expirado", "WARNING")
             return None
         except jwt.InvalidTokenError as e:
-            logger.warning(f"⚠️ Token inválido: {e}")
+            log_security_event(logger, "invalid_token", str(e), "WARNING")
             return None
         except Exception as e:
-            logger.error(f"❌ Error verificando token: {e}")
+            logger.error(f"Error verificando token: {e}")
+            log_security_event(logger, "token_verification_error", str(e), "ERROR")
             return None
     
     @staticmethod
@@ -109,8 +111,8 @@ class AuthService:
             base_url = getattr(settings, 'DASHBOARD_URL', 'https://loki-dashboard.vercel.app')
         
         dashboard_link = f"{base_url}/auth?token={token}"
-        
-        logger.info(f"🔗 Link de dashboard generado para usuario {usuario_id}")
+
+        logger.info(f"Link de dashboard generado para usuario {usuario_id}")
         return dashboard_link
 
 
