@@ -31,6 +31,12 @@ interface TrustLevel {
   es_nivel_maximo?: boolean;
 }
 
+interface WeeklyDataPoint {
+  day: string;
+  mood: number;
+  activities: number;
+}
+
 interface UserData {
   id: number;
   nombre: string;
@@ -40,6 +46,7 @@ interface UserData {
   frecuencia_checkins?: string;
   moods?: MoodData[];
   trust_level?: TrustLevel;
+  weekly_data?: WeeklyDataPoint[];
 }
 
 export default function DashboardPage() {
@@ -112,15 +119,18 @@ export default function DashboardPage() {
     mensajes_hasta_siguiente_nivel: 10
   };
 
-  const weeklyTrend = [
-    { day: 'Lun', mood: 7, activities: 3 },
-    { day: 'Mar', mood: 6, activities: 2 },
-    { day: 'Mié', mood: 8, activities: 4 },
-    { day: 'Jue', mood: 7, activities: 3 },
-    { day: 'Vie', mood: 9, activities: 5 },
-    { day: 'Sáb', mood: 8, activities: 4 },
-    { day: 'Dom', mood: 7, activities: 2 },
-  ];
+  // Usar datos reales de la API o datos de ejemplo si no hay datos
+  const weeklyTrend = userData.weekly_data && userData.weekly_data.length > 0
+    ? userData.weekly_data
+    : [
+        { day: 'Lun', mood: 0, activities: 0 },
+        { day: 'Mar', mood: 0, activities: 0 },
+        { day: 'Mié', mood: 0, activities: 0 },
+        { day: 'Jue', mood: 0, activities: 0 },
+        { day: 'Vie', mood: 0, activities: 0 },
+        { day: 'Sáb', mood: 0, activities: 0 },
+        { day: 'Dom', mood: 0, activities: 0 },
+      ];
 
   const getMoodEmoji = (mood: number) => {
     if (mood >= 9) return '😄';
@@ -253,21 +263,55 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <Card>
             <CardHeader>
-              <CardTitle>Tendencia de ánimo</CardTitle>
-              <CardDescription>Últimos 7 días</CardDescription>
+              <CardTitle className="flex items-center justify-between">
+                <span>Tendencia de ánimo</span>
+                {userData.weekly_data && userData.weekly_data.length > 0 && (
+                  <Badge className="bg-green-100 text-green-800 border-green-300">
+                    Datos reales
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Últimos 7 días
+                {(!userData.weekly_data || userData.weekly_data.length === 0) && (
+                  <span className="text-orange-600"> - Sin datos aún</span>
+                )}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <MoodTrendChart data={weeklyTrend} />
+              {(!userData.weekly_data || userData.weekly_data.length === 0) && (
+                <p className="text-sm text-gray-500 mt-2 text-center">
+                  Registra tu ánimo para ver tendencias aquí
+                </p>
+              )}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Actividades completadas</CardTitle>
-              <CardDescription>Hábitos y check-ins semanales</CardDescription>
+              <CardTitle className="flex items-center justify-between">
+                <span>Actividades completadas</span>
+                {userData.weekly_data && userData.weekly_data.length > 0 && (
+                  <Badge className="bg-green-100 text-green-800 border-green-300">
+                    Datos reales
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Hábitos y check-ins semanales
+                {(!userData.weekly_data || userData.weekly_data.length === 0) && (
+                  <span className="text-orange-600"> - Sin datos aún</span>
+                )}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <ActivitiesChart data={weeklyTrend} />
+              {(!userData.weekly_data || userData.weekly_data.length === 0) && (
+                <p className="text-sm text-gray-500 mt-2 text-center">
+                  Completa actividades para ver tu progreso
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>

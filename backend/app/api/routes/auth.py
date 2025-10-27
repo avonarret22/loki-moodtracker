@@ -3,12 +3,16 @@ Endpoints de autenticación para acceso al dashboard.
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func, cast, Integer
 from pydantic import BaseModel
+from datetime import datetime, timedelta
+from collections import defaultdict
 
 from app.db.session import get_db
 from app.services.auth_service import auth_service
 from app.services.trust_level_service import trust_service
 from app.crud import mood as crud
+from app.models.mood import EstadoAnimo, RegistroHabito
 
 router = APIRouter()
 
@@ -110,6 +114,76 @@ async def verify_dashboard_token(
     )
 
 
+def _get_weekly_data(db: Session, usuario_id: int):
+    """
+    Obtiene datos agregados de los últimos 7 días para gráficos.
+
+    Returns:
+        Lista de datos por día: [{"day": "Lun", "mood": 7.5, "activities": 3}, ...]
+    """
+    # Calcular fecha de hace 7 días
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+
+    # Nombres de días en español
+    day_names = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+
+    # Inicializar estructura de datos para los últimos 7 días
+    today = datetime.utcnow()
+    weekly_data = {}
+
+    for i in range(7):
+        day = today - timedelta(days=6-i)  # Empezar desde hace 6 días
+        day_key = day.strftime('%Y-%m-%d')
+        weekday_index = day.weekday()
+
+        weekly_data[day_key] = {
+            'day': day_names[weekday_index],
+            'mood': 0,
+            'mood_count': 0,
+            'activities': 0
+        }
+
+    # Obtener moods de los últimos 7 días
+    moods = db.query(EstadoAnimo).filter(
+        EstadoAnimo.usuario_id == usuario_id,
+        EstadoAnimo.timestamp >= seven_days_ago
+    ).all()
+
+    # Agregar moods por día
+    for mood in moods:
+        day_key = mood.timestamp.strftime('%Y-%m-%d')
+        if day_key in weekly_data:
+            weekly_data[day_key]['mood'] += mood.nivel
+            weekly_data[day_key]['mood_count'] += 1
+
+    # Obtener actividades (registros de hábitos) de los últimos 7 días
+    activities = db.query(RegistroHabito).filter(
+        RegistroHabito.usuario_id == usuario_id,
+        RegistroHabito.timestamp >= seven_days_ago,
+        RegistroHabito.completado == True
+    ).all()
+
+    # Contar actividades por día
+    for activity in activities:
+        day_key = activity.timestamp.strftime('%Y-%m-%d')
+        if day_key in weekly_data:
+            weekly_data[day_key]['activities'] += 1
+
+    # Convertir a lista y calcular promedios
+    result = []
+    for day_key in sorted(weekly_data.keys()):
+        data = weekly_data[day_key]
+        avg_mood = round(data['mood'] / data['mood_count'], 1) if data['mood_count'] > 0 else 0
+
+        result.append({
+            'day': data['day'],
+            'mood': avg_mood,
+            'activities': data['activities']
+        })
+
+    return result
+
+
 @router.get("/me")
 async def get_current_user(
     token: str,
@@ -122,7 +196,7 @@ async def get_current_user(
         token: Token JWT del usuario
 
     Returns:
-        Información completa del usuario incluyendo moods y trust level
+        Información completa del usuario incluyendo moods, trust level y datos semanales para gráficos
     """
     token_data = auth_service.verify_token(token)
 
@@ -155,6 +229,9 @@ async def get_current_user(
     # Obtener información del nivel de confianza
     trust_info = trust_service.get_user_trust_info(db, usuario_id)
 
+    # Obtener datos semanales para gráficos
+    weekly_data = _get_weekly_data(db, usuario_id)
+
     return {
         "id": usuario.id,
         "nombre": usuario.nombre,
@@ -163,6 +240,7 @@ async def get_current_user(
         "nivel_CMV": usuario.nivel_CMV,
         "frecuencia_checkins": usuario.frecuencia_checkins,
         "moods": moods,
+        "weekly_data": weekly_data,  # NUEVO: datos para gráficos
         "trust_level": trust_info if trust_info else {
             "nivel_confianza": 1,
             "total_interacciones": 0,
