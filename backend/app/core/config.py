@@ -13,9 +13,9 @@ class Settings(BaseSettings):
     )
     API_V1_STR: str = Field("/api/v1", env="API_V1_STR")
 
-    # Para desarrollo local usamos SQLite, en producción se puede usar PostgreSQL
+    # Base de datos - Por defecto SQLite local, PostgreSQL en producción
     DATABASE_URL: str = Field(
-        "sqlite:///./moodtracker.db",
+        "sqlite:///./data/moodtracker.db",
         env="DATABASE_URL",
     )
     
