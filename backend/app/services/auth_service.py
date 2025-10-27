@@ -99,20 +99,27 @@ class AuthService:
         Args:
             usuario_id: ID del usuario
             telefono: Número de teléfono del usuario
-            base_url: URL base del dashboard (default: settings)
+            base_url: URL base del dashboard (default: Railway public URL)
             
         Returns:
             URL completa con token
         """
         token = AuthService.generate_dashboard_token(usuario_id, telefono)
         
-        # URL base del dashboard - en producción vendrá de variable de entorno
+        # Detectar la URL del servicio automáticamente
         if base_url is None:
-            base_url = getattr(settings, 'DASHBOARD_URL', 'https://loki-dashboard.vercel.app')
+            import os
+            # Railway proporciona RAILWAY_PUBLIC_DOMAIN automáticamente
+            railway_domain = os.getenv('RAILWAY_PUBLIC_DOMAIN', '')
+            if railway_domain:
+                base_url = f'https://{railway_domain}/dashboard'
+            else:
+                # Fallback para desarrollo local
+                base_url = 'http://localhost:8000/dashboard'
         
         dashboard_link = f"{base_url}/auth?token={token}"
 
-        logger.info(f"Link de dashboard generado para usuario {usuario_id}")
+        logger.info(f"Link de dashboard generado para usuario {usuario_id}: {base_url}")
         return dashboard_link
 
 
