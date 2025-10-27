@@ -71,37 +71,12 @@ async def receive_twilio_webhook(
         print(f"   ID: {message_id}")
         
         # Buscar o crear usuario basado en el número de teléfono (con manejo robusto de race conditions)
-        usuario = crud.get_usuario_by_telefono(db, telefono=phone_number)
-        
-        if not usuario:
-            # Crear nuevo usuario si es la primera vez que escribe
-            try:
-                usuario_data = schemas.UsuarioCreate(
-                    nombre=f"Usuario {phone_number[-4:]}",  # Nombre temporal
-                    telefono=phone_number
-                )
-                usuario = crud.create_usuario(db, usuario=usuario_data)
-                logger.info(f"✅ Nuevo usuario creado: {usuario.id}")
-            except Exception as create_error:
-                # Si falla por duplicado (race condition), reintentar con exponential backoff
-                logger.warning(f"Error creando usuario (probablemente ya existe): {create_error}")
-                db.rollback()
-                db.expire_all()  # Limpiar caché de la sesión
-                
-                # Reintentar hasta 3 veces con delay incremental
-                import time
-                for attempt in range(3):
-                    time.sleep(0.1 * (attempt + 1))  # 100ms, 200ms, 300ms
-                    db.expire_all()  # Limpiar caché antes de cada intento
-                    usuario = crud.get_usuario_by_telefono(db, telefono=phone_number)
-                    if usuario:
-                        logger.info(f"✅ Usuario encontrado en intento {attempt + 1}: {usuario.id}")
-                        break
-                
-                if not usuario:
-                    # Si aún no existe después de 3 reintentos, es un error real
-                    logger.error(f"Usuario no encontrado después de 3 reintentos para {phone_number}")
-                    raise create_error
+        usuario_data = schemas.UsuarioCreate(
+            nombre=f"Usuario {phone_number[-4:]}",  # Nombre temporal
+            telefono=phone_number
+        )
+        usuario = crud.get_or_create_usuario(db, usuario=usuario_data)
+        logger.info(f"✅ Usuario obtenido/creado: {usuario.id}")
         
         # COMANDO ESPECIAL: Dashboard
         message_lower = message_text.lower().strip()

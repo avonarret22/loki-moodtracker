@@ -29,6 +29,31 @@ def create_usuario(db: Session, usuario: UsuarioCreate):
     return db_usuario
 
 
+def get_or_create_usuario(db: Session, usuario: UsuarioCreate):
+    """
+    Obtiene un usuario existente o lo crea si no existe.
+    Thread-safe para race conditions.
+    """
+    # Primero intentar obtenerlo
+    existing = get_usuario_by_telefono(db, telefono=usuario.telefono)
+    if existing:
+        return existing
+    
+    # Si no existe, intentar crearlo
+    try:
+        return create_usuario(db, usuario=usuario)
+    except Exception:
+        # Si falla (probablemente por race condition), obtenerlo de nuevo
+        db.rollback()
+        # Esperar un poco para asegurar que la otra transacción termine
+        import time
+        time.sleep(0.05)  # 50ms
+        existing = get_usuario_by_telefono(db, telefono=usuario.telefono)
+        if existing:
+            return existing
+        raise  # Si aún no existe, re-lanzar el error original
+
+
 # ===== EstadoAnimo CRUD =====
 def get_estado_animo(db: Session, estado_animo_id: int):
     return db.query(EstadoAnimo).filter(EstadoAnimo.id == estado_animo_id).first()
