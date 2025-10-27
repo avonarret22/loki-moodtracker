@@ -73,7 +73,7 @@ async def dashboard_auth(
     habitos = crud.get_habitos_by_usuario(db, usuario_id=usuario.id)
     
     # Calcular promedio de estados de ánimo
-    avg_score = sum(e.puntuacion for e in estados) / len(estados) if estados else 0
+    avg_score = sum(e.nivel for e in estados) / len(estados) if estados else 0
     
     # Generar HTML del dashboard
     html_content = f"""
@@ -186,10 +186,10 @@ async def dashboard_auth(
                     {''.join([
                         f'''<div class="list-item">
                         <div>
-                            <strong>{e.fecha_registro.strftime("%d/%m/%Y %H:%M")}</strong>
-                            <p style="color: #718096; margin: 0.25rem 0 0 0;">{e.notas or "Sin notas"}</p>
+                            <strong>{e.timestamp.strftime("%d/%m/%Y %H:%M")}</strong>
+                            <p style="color: #718096; margin: 0.25rem 0 0 0;">{e.notas_texto or "Sin notas"}</p>
                         </div>
-                        <span class="badge">{e.puntuacion}/10</span>
+                        <span class="badge">{e.nivel}/10</span>
                     </div>''' for e in estados[-5:][::-1]
                     ])}
                     {'' if estados else '<p style="color: #718096; text-align: center;">Aún no hay registros de estado de ánimo.</p>'}
