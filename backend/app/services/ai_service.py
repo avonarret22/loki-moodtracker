@@ -29,21 +29,21 @@ class LokiAIService:
         self.conversation_mode = 'conciso'
 
         # Debug: Verificar que se cargó la key
-        print(f"🔍 Anthropic API Key presente: {bool(self.anthropic_key)}")
+        print(f"[DEBUG] Anthropic API Key presente: {bool(self.anthropic_key)}")
         if self.anthropic_key:
-            print(f"🔍 Key empieza con: {self.anthropic_key[:15]}...")
+            print(f"[DEBUG] Key empieza con: {self.anthropic_key[:15]}...")
 
         # Inicializar cliente de Claude si tenemos la API key
         if self.anthropic_key:
             try:
                 self.claude_client = Anthropic(api_key=self.anthropic_key)
-                print("✅ Claude API inicializada correctamente")
+                print("[OK] Claude API inicializada correctamente")
             except Exception as e:
                 self.claude_client = None
-                print(f"❌ Error al inicializar Claude: {e}")
+                print(f"[ERROR] Error al inicializar Claude: {e}")
         else:
             self.claude_client = None
-            print("⚠️ Claude API key no encontrada, usando respuestas basadas en reglas")
+            print("[WARNING] Claude API key no encontrada, usando respuestas basadas en reglas")
         
     def _get_trust_based_system_prompt(self, usuario_nombre: str, nivel_confianza: int, nivel_info: Dict) -> str:
         """
