@@ -183,29 +183,29 @@ async def dashboard_auth(
                 
                 <div class="card">
                     <h2>📊 Últimos Estados de Ánimo</h2>
-                    {''.join(f"""
-                    <div class="list-item">
+                    {''.join([
+                        f'''<div class="list-item">
                         <div>
-                            <strong>{e.fecha_registro.strftime('%d/%m/%Y %H:%M')}</strong>
-                            <p style="color: #718096; margin: 0.25rem 0 0 0;">{e.notas or 'Sin notas'}</p>
+                            <strong>{e.fecha_registro.strftime("%d/%m/%Y %H:%M")}</strong>
+                            <p style="color: #718096; margin: 0.25rem 0 0 0;">{e.notas or "Sin notas"}</p>
                         </div>
                         <span class="badge">{e.puntuacion}/10</span>
-                    </div>
-                    """ for e in estados[-5:][::-1])}
+                    </div>''' for e in estados[-5:][::-1]
+                    ])}
                     {'' if estados else '<p style="color: #718096; text-align: center;">Aún no hay registros de estado de ánimo.</p>'}
                 </div>
                 
                 <div class="card">
                     <h2>💪 Hábitos en Seguimiento</h2>
-                    {''.join(f"""
-                    <div class="list-item">
+                    {''.join([
+                        f'''<div class="list-item">
                         <div>
                             <strong>{h.nombre}</strong>
-                            <p style="color: #718096; margin: 0.25rem 0 0 0;">{h.descripcion or 'Sin descripción'}</p>
+                            <p style="color: #718096; margin: 0.25rem 0 0 0;">{h.descripcion or "Sin descripción"}</p>
                         </div>
                         <span class="badge">{'🟢 Activo' if h.activo else '⚫ Inactivo'}</span>
-                    </div>
-                    """ for h in habitos)}
+                    </div>''' for h in habitos
+                    ])}
                     {'' if habitos else '<p style="color: #718096; text-align: center;">Aún no tienes hábitos registrados.</p>'}
                 </div>
                 
