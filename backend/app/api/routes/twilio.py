@@ -75,11 +75,21 @@ async def receive_twilio_webhook(
         
         if not usuario:
             # Crear nuevo usuario si es la primera vez que escribe
-            usuario_data = schemas.UsuarioCreate(
-                nombre=f"Usuario {phone_number[-4:]}",  # Nombre temporal
-                telefono=phone_number
-            )
-            usuario = crud.create_usuario(db, usuario=usuario_data)
+            try:
+                usuario_data = schemas.UsuarioCreate(
+                    nombre=f"Usuario {phone_number[-4:]}",  # Nombre temporal
+                    telefono=phone_number
+                )
+                usuario = crud.create_usuario(db, usuario=usuario_data)
+                logger.info(f"✅ Nuevo usuario creado: {usuario.id}")
+            except Exception as create_error:
+                # Si falla por duplicado (race condition), intentar buscar de nuevo
+                logger.warning(f"Error creando usuario (probablemente ya existe): {create_error}")
+                db.rollback()
+                usuario = crud.get_usuario_by_telefono(db, telefono=phone_number)
+                if not usuario:
+                    # Si aún no existe, re-lanzar el error original
+                    raise create_error
         
         # COMANDO ESPECIAL: Dashboard
         message_lower = message_text.lower().strip()
