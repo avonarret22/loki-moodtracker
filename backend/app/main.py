@@ -43,8 +43,10 @@ def create_app() -> FastAPI:
         allow_headers=["Authorization", "Content-Type"],
     )
 
-    # Crear las tablas en la base de datos
-    mood.Base.metadata.create_all(bind=engine)
+    # NOTA: Las tablas se crean usando migraciones de Alembic
+    # Para aplicar migraciones: cd backend && python -m alembic upgrade head
+    # Para crear nuevas migraciones: python -m alembic revision --autogenerate -m "Descripción"
+    # NO usar Base.metadata.create_all() en producción - puede sobrescribir datos
 
     # Include routers
     app.include_router(health_router, prefix="/health", tags=["health"])

@@ -3,7 +3,20 @@
     "allow": [
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Read(//c/Users/Diego/Downloads/**)"
+      "Read(//c/Users/Diego/Downloads/**)",
+      "Bash(python migrations/run_migration.py:*)",
+      "Bash(python:*)",
+      "Bash(sqlite3:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(gh pr create:*)",
+      "Bash(tree:*)",
+      "Bash(find:*)",
+      "Bash(npm install:*)",
+      "Bash(alembic init:*)",
+      "Bash(pip install:*)"
     ],
     "deny": [],
     "ask": []

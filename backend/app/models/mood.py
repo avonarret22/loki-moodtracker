@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Boolean, Float
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Boolean, Float, Index
 from sqlalchemy.orm import relationship
 import datetime
 
@@ -36,12 +36,17 @@ class EstadoAnimo(Base):
     __tablename__ = 'estados_animo'
 
     id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False, index=True)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     nivel = Column(Integer, nullable=False)  # Nivel de 1 a 10
     notas_texto = Column(Text, nullable=True)
     contexto_extraido = Column(Text, nullable=True)
     disparadores_detectados = Column(Text, nullable=True)
+
+    # Índices compuestos para optimizar queries frecuentes
+    __table_args__ = (
+        Index('ix_estados_animo_usuario_timestamp', 'usuario_id', 'timestamp'),
+    )
 
     usuario = relationship("Usuario", back_populates="estados_animo")
 
@@ -50,12 +55,18 @@ class Habito(Base):
     __tablename__ = 'habitos'
 
     id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False, index=True)
     nombre_habito = Column(String, nullable=False)
     categoria = Column(String, nullable=True)  # ej: ejercicio, social, sueño, trabajo
     objetivo_semanal = Column(Integer, default=0)  # Número de veces por semana
     activo = Column(Boolean, default=True)
     fecha_creacion = Column(DateTime, default=datetime.datetime.utcnow)
+
+    # Índices compuestos para optimizar queries frecuentes
+    __table_args__ = (
+        Index('ix_habitos_usuario_activo', 'usuario_id', 'activo'),
+        Index('ix_habitos_usuario_nombre', 'usuario_id', 'nombre_habito'),
+    )
 
     usuario = relationship("Usuario", back_populates="habitos")
     registros = relationship("RegistroHabito", back_populates="habito", cascade="all, delete-orphan")
@@ -65,11 +76,17 @@ class RegistroHabito(Base):
     __tablename__ = 'registros_habitos'
 
     id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
-    habito_id = Column(Integer, ForeignKey('habitos.id'), nullable=False)
+    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False, index=True)
+    habito_id = Column(Integer, ForeignKey('habitos.id'), nullable=False, index=True)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     completado = Column(Boolean, default=True)
     notas = Column(Text, nullable=True)
+
+    # Índices compuestos para optimizar queries frecuentes
+    __table_args__ = (
+        Index('ix_registros_habitos_usuario_timestamp', 'usuario_id', 'timestamp'),
+        Index('ix_registros_habitos_habito_timestamp', 'habito_id', 'timestamp'),
+    )
 
     usuario = relationship("Usuario", back_populates="registros_habitos")
     habito = relationship("Habito", back_populates="registros")
@@ -79,12 +96,18 @@ class ConversacionContexto(Base):
     __tablename__ = 'conversaciones_contexto'
 
     id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False, index=True)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     mensaje_usuario = Column(Text, nullable=False)
     respuesta_loki = Column(Text, nullable=True)
     entidades_extraidas = Column(Text, nullable=True)  # JSON como string
     categorias_detectadas = Column(Text, nullable=True)  # JSON como string
+
+    # Índices compuestos para optimizar queries frecuentes
+    # Orden DESC en timestamp para obtener las más recientes primero
+    __table_args__ = (
+        Index('ix_conversaciones_usuario_timestamp_desc', 'usuario_id', 'timestamp'),
+    )
 
     usuario = relationship("Usuario", back_populates="conversaciones")
 
@@ -93,12 +116,17 @@ class Correlacion(Base):
     __tablename__ = 'correlaciones'
 
     id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False, index=True)
     factor = Column(String, nullable=False)  # ej: "ejercicio", "dormir_bien"
     impacto_animo = Column(Float, nullable=False)  # Correlación: -1 a 1
     confianza_estadistica = Column(Float, nullable=False)  # 0 a 1
     num_datos = Column(Integer, default=0)  # Cantidad de datos usados para calcular
     fecha_calculo = Column(DateTime, default=datetime.datetime.utcnow)
+
+    # Índices compuestos para optimizar queries frecuentes
+    __table_args__ = (
+        Index('ix_correlaciones_usuario_fecha', 'usuario_id', 'fecha_calculo'),
+    )
 
     usuario = relationship("Usuario", back_populates="correlaciones")
 
@@ -107,7 +135,7 @@ class ResumenConversacion(Base):
     __tablename__ = 'resumenes_conversacion'
 
     id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False, index=True)
     fecha_resumen = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     resumen_texto = Column(Text, nullable=False)  # Resumen en lenguaje natural
     temas_principales = Column(Text, nullable=True)  # JSON: lista de temas
@@ -116,6 +144,11 @@ class ResumenConversacion(Base):
     num_mensajes = Column(Integer, default=0)  # Cantidad de mensajes resumidos
     periodo_inicio = Column(DateTime, nullable=True)  # Cuándo comenzó este período
     periodo_fin = Column(DateTime, nullable=True)  # Cuándo terminó este período
+
+    # Índices compuestos para optimizar queries frecuentes
+    __table_args__ = (
+        Index('ix_resumenes_usuario_fecha', 'usuario_id', 'fecha_resumen'),
+    )
 
     usuario = relationship("Usuario", back_populates="resumenes_conversacion")
 
@@ -141,7 +174,7 @@ class FeedbackRespuesta(Base):
     __tablename__ = 'feedback_respuestas'
 
     id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False, index=True)
     conversacion_id = Column(Integer, ForeignKey('conversaciones_contexto.id'), nullable=True)
     mensaje_usuario = Column(Text, nullable=False)
     respuesta_loki = Column(Text, nullable=False)
@@ -149,6 +182,12 @@ class FeedbackRespuesta(Base):
     ayudo = Column(Boolean, default=False)  # ¿Realmente ayudó?
     notas_feedback = Column(Text, nullable=True)  # Comentarios del usuario
     timestamp = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+
+    # Índices compuestos para optimizar queries frecuentes
+    __table_args__ = (
+        Index('ix_feedback_usuario_timestamp', 'usuario_id', 'timestamp'),
+        Index('ix_feedback_usuario_rating', 'usuario_id', 'utilidad_rating'),
+    )
 
     usuario = relationship("Usuario", back_populates="feedbacks")
 

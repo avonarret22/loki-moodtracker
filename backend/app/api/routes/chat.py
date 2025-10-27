@@ -33,22 +33,24 @@ async def chat_with_loki(chat_msg: ChatMessage, db: Session = Depends(get_db)):
     """
     Endpoint para chatear con Loki sin WhatsApp.
     Útil para testing y desarrollo.
+
+    IMPORTANTE: Usa transacciones explícitas para garantizar consistencia de datos.
     """
     print(f"\n{'='*60}")
     print(f"📨 Nuevo mensaje recibido de usuario {chat_msg.usuario_id}")
     print(f"📝 Mensaje: '{chat_msg.mensaje}'")
     print(f"{'='*60}\n")
-    
-    # Verificar que el usuario existe
+
+    # Verificar que el usuario existe (fuera de la transacción)
     usuario = crud.get_usuario(db, usuario_id=chat_msg.usuario_id)
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
-    # Obtener conversaciones recientes para contexto
+    # Obtener conversaciones recientes para contexto (lectura, fuera de transacción)
     conversaciones_recientes = crud.get_conversaciones_by_usuario(
         db, usuario_id=usuario.id, limit=5
     )
-    
+
     contexto_reciente = [
         {
             'mensaje_usuario': conv.mensaje_usuario,
@@ -56,74 +58,95 @@ async def chat_with_loki(chat_msg: ChatMessage, db: Session = Depends(get_db)):
         }
         for conv in conversaciones_recientes
     ]
-    
-    # Actualizar nivel de confianza (incrementa contador de interacciones)
-    trust_update = trust_service.update_trust_level(db, usuario.id)
-    if trust_update.get('nivel_cambio'):
-        print(f"🎉 ¡Nivel de confianza aumentó! Ahora: {trust_update['nivel_info']['name']}")
 
-    # Generar respuesta con Loki AI (ahora con análisis de patrones)
+    # Generar respuesta con Loki AI (operación de solo lectura)
     ai_response = await loki_service.generate_response(
         mensaje_usuario=chat_msg.mensaje,
         usuario_nombre=usuario.nombre,
         contexto_reciente=contexto_reciente,
-        db_session=db,  # Pasar sesión de BD para análisis de patrones
-        usuario_id=usuario.id  # Pasar ID de usuario
+        db_session=db,
+        usuario_id=usuario.id
     )
 
-    # Guardar la conversación
-    conversacion_data = schemas.ConversacionContextoCreate(
-        mensaje_usuario=chat_msg.mensaje,
-        respuesta_loki=ai_response['respuesta'],
-        entidades_extraidas=json.dumps(ai_response['context_extracted'], ensure_ascii=False),
-        categorias_detectadas=json.dumps(ai_response['context_extracted'].get('habits_mentioned', []))
-    )
-    crud.create_conversacion(db, conversacion=conversacion_data, usuario_id=usuario.id)
-    
-    # Si se detectó un nivel de ánimo, registrarlo
-    mood_registrado = False
-    mood_level = ai_response['context_extracted'].get('mood_level')
-    if mood_level:
-        estado_animo_data = schemas.EstadoAnimoCreate(
-            nivel=mood_level,
-            notas_texto=chat_msg.mensaje,
-            contexto_extraido=json.dumps(ai_response['context_extracted'], ensure_ascii=False),
-            disparadores_detectados=json.dumps(
-                ai_response['context_extracted'].get('emotional_triggers', [])
-            )
+    # INICIO DE TRANSACCIÓN EXPLÍCITA
+    # Todas las operaciones de escritura deben hacerse juntas
+    try:
+        # Usar begin_nested() para crear un savepoint que podemos rollback si falla algo
+        db.begin_nested()
+
+        # 1. Actualizar nivel de confianza
+        trust_update = trust_service.update_trust_level(db, usuario.id)
+        if trust_update.get('nivel_cambio'):
+            print(f"🎉 ¡Nivel de confianza aumentó! Ahora: {trust_update['nivel_info']['name']}")
+
+        # 2. Guardar la conversación
+        conversacion_data = schemas.ConversacionContextoCreate(
+            mensaje_usuario=chat_msg.mensaje,
+            respuesta_loki=ai_response['respuesta'],
+            entidades_extraidas=json.dumps(ai_response['context_extracted'], ensure_ascii=False),
+            categorias_detectadas=json.dumps(ai_response['context_extracted'].get('habits_mentioned', []))
         )
-        crud.create_estado_animo(db, estado_animo=estado_animo_data, usuario_id=usuario.id)
-        mood_registrado = True
-    
-    # Registrar hábitos mencionados
-    habits_mentioned = ai_response['context_extracted'].get('habits_mentioned', [])
-    for habit_name in habits_mentioned:
-        # Buscar o crear el hábito
-        existing_habits = crud.get_habitos_by_usuario(db, usuario_id=usuario.id)
-        habit_exists = any(h.nombre_habito.lower() == habit_name.lower() for h in existing_habits)
-        
-        if not habit_exists:
-            # Crear nuevo hábito
-            from app.schemas import HabitoCreate
-            habit_data = HabitoCreate(
-                nombre_habito=habit_name,
-                categoria=_categorize_habit(habit_name),
-                objetivo_semanal=3
+        crud.create_conversacion(db, conversacion=conversacion_data, usuario_id=usuario.id)
+
+        # 3. Si se detectó un nivel de ánimo, registrarlo
+        mood_registrado = False
+        mood_level = ai_response['context_extracted'].get('mood_level')
+        if mood_level:
+            estado_animo_data = schemas.EstadoAnimoCreate(
+                nivel=mood_level,
+                notas_texto=chat_msg.mensaje,
+                contexto_extraido=json.dumps(ai_response['context_extracted'], ensure_ascii=False),
+                disparadores_detectados=json.dumps(
+                    ai_response['context_extracted'].get('emotional_triggers', [])
+                )
             )
-            habit = crud.create_habito(db, habito=habit_data, usuario_id=usuario.id)
-        else:
-            # Encontrar el hábito existente
-            habit = next(h for h in existing_habits if h.nombre_habito.lower() == habit_name.lower())
-        
-        # Registrar que el hábito fue mencionado/realizado hoy
-        from app.schemas import RegistroHabitoCreate
-        registro_data = RegistroHabitoCreate(
-            habito_id=habit.id,
-            completado=True,
-            notas=f"Mencionado en conversación: {chat_msg.mensaje[:50]}..."
+            crud.create_estado_animo(db, estado_animo=estado_animo_data, usuario_id=usuario.id)
+            mood_registrado = True
+
+        # 4. Registrar hábitos mencionados
+        habits_mentioned = ai_response['context_extracted'].get('habits_mentioned', [])
+        for habit_name in habits_mentioned:
+            # Buscar o crear el hábito
+            existing_habits = crud.get_habitos_by_usuario(db, usuario_id=usuario.id)
+            habit_exists = any(h.nombre_habito.lower() == habit_name.lower() for h in existing_habits)
+
+            if not habit_exists:
+                # Crear nuevo hábito
+                from app.schemas import HabitoCreate
+                habit_data = HabitoCreate(
+                    nombre_habito=habit_name,
+                    categoria=_categorize_habit(habit_name),
+                    objetivo_semanal=3
+                )
+                habit = crud.create_habito(db, habito=habit_data, usuario_id=usuario.id)
+            else:
+                # Encontrar el hábito existente
+                habit = next(h for h in existing_habits if h.nombre_habito.lower() == habit_name.lower())
+
+            # Registrar que el hábito fue mencionado/realizado hoy
+            from app.schemas import RegistroHabitoCreate
+            registro_data = RegistroHabitoCreate(
+                habito_id=habit.id,
+                completado=True,
+                notas=f"Mencionado en conversación: {chat_msg.mensaje[:50]}..."
+            )
+            crud.create_registro_habito(db, registro=registro_data, usuario_id=usuario.id)
+
+        # Si todo salió bien, hacer commit de la transacción
+        db.commit()
+        print("✅ Transacción completada exitosamente")
+
+    except Exception as e:
+        # Si algo falla, hacer rollback de TODAS las operaciones
+        db.rollback()
+        print(f"❌ Error en transacción, rollback ejecutado: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error procesando mensaje. Por favor intenta de nuevo. Error: {str(e)}"
         )
-        crud.create_registro_habito(db, registro=registro_data, usuario_id=usuario.id)
-    
+
+    # FIN DE TRANSACCIÓN
+
     return ChatResponse(
         respuesta=ai_response['respuesta'],
         contexto_extraido=ai_response['context_extracted'],
