@@ -83,17 +83,25 @@ async def receive_twilio_webhook(
                 usuario = crud.create_usuario(db, usuario=usuario_data)
                 logger.info(f"✅ Nuevo usuario creado: {usuario.id}")
             except Exception as create_error:
-                # Si falla por duplicado (race condition), limpiar sesión y buscar de nuevo
+                # Si falla por duplicado (race condition), reintentar con exponential backoff
                 logger.warning(f"Error creando usuario (probablemente ya existe): {create_error}")
                 db.rollback()
-                db.expire_all()  # Limpiar caché de la sesión después del rollback
-                usuario = crud.get_usuario_by_telefono(db, telefono=phone_number)
+                db.expire_all()  # Limpiar caché de la sesión
+                
+                # Reintentar hasta 3 veces con delay incremental
+                import time
+                for attempt in range(3):
+                    time.sleep(0.1 * (attempt + 1))  # 100ms, 200ms, 300ms
+                    db.expire_all()  # Limpiar caché antes de cada intento
+                    usuario = crud.get_usuario_by_telefono(db, telefono=phone_number)
+                    if usuario:
+                        logger.info(f"✅ Usuario encontrado en intento {attempt + 1}: {usuario.id}")
+                        break
+                
                 if not usuario:
-                    # Si aún no existe después de limpiar caché, es un error real
-                    logger.error(f"Usuario no encontrado después de rollback para {phone_number}")
+                    # Si aún no existe después de 3 reintentos, es un error real
+                    logger.error(f"Usuario no encontrado después de 3 reintentos para {phone_number}")
                     raise create_error
-                else:
-                    logger.info(f"✅ Usuario encontrado después de rollback: {usuario.id}")
         
         # COMANDO ESPECIAL: Dashboard
         message_lower = message_text.lower().strip()
