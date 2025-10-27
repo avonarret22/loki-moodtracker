@@ -7,6 +7,7 @@ __pycache__/
 *.db
 moodtracker.db
 .env
+backend/.env
 .venv/
 venv/
 
