@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     
     OPENAI_API_KEY: str | None = Field(default=None, env="OPENAI_API_KEY")
     ANTHROPIC_API_KEY: str | None = Field(default=None, env="ANTHROPIC_API_KEY")
+    # API key for Copilot / Google APIs (do NOT commit this key to source control)
+    COPILOT_API_KEY: str | None = Field(default=None, env="COPILOT_API_KEY")
     
     # Twilio WhatsApp Configuration
     TWILIO_ACCOUNT_SID: str | None = Field(default=None, env="TWILIO_ACCOUNT_SID")

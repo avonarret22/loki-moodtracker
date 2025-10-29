@@ -46,6 +46,7 @@ ANTHROPIC_API_KEY=tu_api_key_aqui
 OPENAI_API_KEY=tu_api_key_aqui
 WHATSAPP_ACCESS_TOKEN=tu_token_aqui
 WHATSAPP_VERIFY_TOKEN=tu_verify_token_aqui
+COPILOT_API_KEY=tu_api_key_de_copilot_aqui
 ```
 
 4. Ejecutar la aplicación:
