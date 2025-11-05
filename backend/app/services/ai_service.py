@@ -629,10 +629,10 @@ Ejemplos:
             if usuario_nombre and not usuario_nombre.startswith("Usuario "):
                 return {
                     'respuesta': f"Tu nombre es {usuario_nombre}. ¿Quieres que lo cambie?",
-                    'context_extracted': {},
+                    'context_extracted': {'esperando_confirmacion_cambio_nombre': True},
                     'nombre_detectado': None,
                     'esperando_nombre': False,
-                    'needs_followup': False
+                    'needs_followup': True
                 }
             else:
                 return {
@@ -643,7 +643,76 @@ Ejemplos:
                     'needs_followup': False
                 }
         
-        # 🆕 Verificar si está intentando actualizar su nombre
+        # 🆕 NUEVO: Verificar si acabamos de preguntar si quiere cambiar el nombre
+        ultima_conversacion_esperando_cambio = False
+        if contexto_reciente and len(contexto_reciente) > 0:
+            ultima_conv = contexto_reciente[-1]
+            entidades = ultima_conv.get('entidades_extraidas', {})
+            if isinstance(entidades, str):
+                try:
+                    entidades = json.loads(entidades)
+                except:
+                    entidades = {}
+            ultima_conversacion_esperando_cambio = entidades.get('esperando_confirmacion_cambio_nombre', False)
+        
+        # Si en la última conversación preguntamos si quiere cambiar el nombre
+        if ultima_conversacion_esperando_cambio:
+            respuestas_afirmativas = ['si', 'sí', 'yes', 'claro', 'por favor', 'dale', 'ok', 'okey', 'cambiar', 'cambialo', 'cámbialo']
+            respuestas_negativas = ['no', 'nope', 'nada', 'dejalo', 'déjalo', 'mantener', 'manten', 'mantén', 'quedar']
+            
+            if any(resp in mensaje_lower for resp in respuestas_afirmativas):
+                # Usuario quiere cambiar su nombre
+                return {
+                    'respuesta': "¿Cómo quieres que te llame?",
+                    'context_extracted': {'esperando_nuevo_nombre': True},
+                    'nombre_detectado': None,
+                    'esperando_nombre': True,
+                    'needs_followup': True
+                }
+            elif any(resp in mensaje_lower for resp in respuestas_negativas):
+                # Usuario NO quiere cambiar su nombre
+                return {
+                    'respuesta': f"Perfecto, {usuario_nombre}. ¿Cómo estás hoy?",
+                    'context_extracted': {},
+                    'nombre_detectado': None,
+                    'esperando_nombre': False,
+                    'needs_followup': False
+                }
+        
+        # 🆕 NUEVO: Verificar si estamos esperando un nuevo nombre
+        ultima_conversacion_esperando_nuevo_nombre = False
+        if contexto_reciente and len(contexto_reciente) > 0:
+            ultima_conv = contexto_reciente[-1]
+            entidades = ultima_conv.get('entidades_extraidas', {})
+            if isinstance(entidades, str):
+                try:
+                    entidades = json.loads(entidades)
+                except:
+                    entidades = {}
+            ultima_conversacion_esperando_nuevo_nombre = entidades.get('esperando_nuevo_nombre', False)
+        
+        # Si estábamos esperando un nuevo nombre, extraerlo
+        if ultima_conversacion_esperando_nuevo_nombre:
+            nombre_detectado_nuevo = self._extract_name_from_message(mensaje_usuario)
+            if nombre_detectado_nuevo:
+                return {
+                    'respuesta': f"¡Perfecto, {nombre_detectado_nuevo}! Te recordaré con ese nombre. ¿Cómo estás hoy?",
+                    'context_extracted': {},
+                    'nombre_detectado': nombre_detectado_nuevo,
+                    'esperando_nombre': False,
+                    'needs_followup': False
+                }
+            else:
+                # No detectamos nombre válido
+                return {
+                    'respuesta': "No estoy seguro de haber entendido tu nombre. ¿Podrías decírmelo de nuevo? Por ejemplo: 'Me llamo Juan'",
+                    'context_extracted': {'esperando_nuevo_nombre': True},
+                    'nombre_detectado': None,
+                    'esperando_nombre': True,
+                    'needs_followup': True
+                }
+        
+        # 🆕 Verificar si está intentando actualizar su nombre (sin haber preguntado antes)
         nombre_detectado_nuevo = self._extract_name_from_message(mensaje_usuario)
         if nombre_detectado_nuevo and usuario_nombre and nombre_detectado_nuevo.lower() != usuario_nombre.lower():
             # El usuario está diciendo un nombre diferente al registrado
