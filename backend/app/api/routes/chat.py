@@ -175,6 +175,115 @@ def _categorize_habit(habit_name: str) -> str:
         return 'otro'
 
 
+@router.delete("/reset/{usuario_id}")
+async def reset_conversation(
+    usuario_id: int,
+    tipo_reset: str = "suave",
+    db: Session = Depends(get_db)
+):
+    """
+    Reinicia la conversación con Loki.
+    
+    Tipos de reset:
+    - "suave" (default): Borra solo el historial de conversaciones.
+                         Mantiene: estados de ánimo, hábitos, perfil, nivel de confianza.
+    - "completo": Borra TODO y empiezas de cero con Loki.
+                  Elimina: conversaciones, estados de ánimo, hábitos, perfil.
+                  Mantiene: Solo tu cuenta de usuario.
+    """
+    from app.models.mood import (
+        ConversacionContexto, EstadoAnimo, Habito, RegistroHabito,
+        PerfilUsuario, ResumenConversacion, Correlacion
+    )
+    
+    # Verificar que el usuario existe
+    usuario = crud.get_usuario(db, usuario_id=usuario_id)
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    try:
+        db.begin_nested()
+        
+        if tipo_reset == "suave":
+            # Solo borrar conversaciones y resúmenes
+            db.query(ConversacionContexto).filter(
+                ConversacionContexto.usuario_id == usuario_id
+            ).delete()
+            
+            db.query(ResumenConversacion).filter(
+                ResumenConversacion.usuario_id == usuario_id
+            ).delete()
+            
+            mensaje = f"✅ Conversaciones reiniciadas para {usuario.nombre}. Tu historial de ánimo y hábitos se mantienen."
+            
+        elif tipo_reset == "completo":
+            # Borrar TODO excepto el usuario
+            db.query(ConversacionContexto).filter(
+                ConversacionContexto.usuario_id == usuario_id
+            ).delete()
+            
+            db.query(ResumenConversacion).filter(
+                ResumenConversacion.usuario_id == usuario_id
+            ).delete()
+            
+            db.query(RegistroHabito).filter(
+                RegistroHabito.usuario_id == usuario_id
+            ).delete()
+            
+            db.query(Habito).filter(
+                Habito.usuario_id == usuario_id
+            ).delete()
+            
+            db.query(EstadoAnimo).filter(
+                EstadoAnimo.usuario_id == usuario_id
+            ).delete()
+            
+            db.query(Correlacion).filter(
+                Correlacion.usuario_id == usuario_id
+            ).delete()
+            
+            # Resetear perfil (no borrarlo, solo limpiarlo)
+            perfil = db.query(PerfilUsuario).filter(
+                PerfilUsuario.usuario_id == usuario_id
+            ).first()
+            
+            if perfil:
+                perfil.nivel_confianza = 1
+                perfil.total_interacciones = 0
+                perfil.interacciones_positivas = 0
+                perfil.ultima_interaccion = None
+                perfil.temas_conversacion = None
+                perfil.patrones_detectados = None
+                perfil.memorias_emocionales = None
+                perfil.topics_pendientes = None
+            
+            mensaje = f"✅ Reset completo realizado para {usuario.nombre}. Todo ha sido reiniciado, empiezas de cero con Loki."
+            
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Tipo de reset inválido. Use 'suave' o 'completo'."
+            )
+        
+        db.commit()
+        print(f"🔄 {mensaje}")
+        
+        return {
+            "success": True,
+            "tipo_reset": tipo_reset,
+            "mensaje": mensaje,
+            "usuario": usuario.nombre
+        }
+        
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Error en reset: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al reiniciar conversación: {str(e)}"
+        )
+
+
 @router.get("/history/{usuario_id}")
 async def get_chat_history(usuario_id: int, limit: int = 20, db: Session = Depends(get_db)):
     """
