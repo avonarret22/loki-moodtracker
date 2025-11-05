@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { 
+  TrendingUp, TrendingDown, Minus, Heart, MessageCircle, 
+  Calendar, Award, Target, Sparkles, Brain, Activity
+} from 'lucide-react';
 
 const MoodTrendChart = dynamic(() => import('@/components/charts').then(mod => mod.MoodTrendChart), {
   ssr: false,
@@ -147,6 +151,20 @@ export default function DashboardPage() {
     return 'text-red-600';
   };
 
+  const getMoodTrend = () => {
+    if (moods.length < 2) return { icon: Minus, text: 'Sin datos suficientes', color: 'text-gray-500' };
+    
+    const recent = moods.slice(-3).reduce((sum, m) => sum + m.nivel, 0) / Math.min(3, moods.length);
+    const older = moods.slice(-7, -3).reduce((sum, m) => sum + m.nivel, 0) / Math.max(1, Math.min(4, moods.length - 3));
+    
+    if (recent > older + 1) return { icon: TrendingUp, text: 'Mejorando', color: 'text-green-600' };
+    if (recent < older - 1) return { icon: TrendingDown, text: 'Bajando', color: 'text-red-600' };
+    return { icon: Minus, text: 'Estable', color: 'text-blue-600' };
+  };
+
+  const moodTrend = getMoodTrend();
+  const TrendIcon = moodTrend.icon;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-orange-50">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
@@ -190,69 +208,202 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-3">
-              <CardDescription>Estado promedio</CardDescription>
-              <CardTitle className={`text-4xl ${typeof avgMood === 'number' ? getMoodColor(parseFloat(avgMood)) : 'text-gray-400'}`}>
-                {avgMood}
-              </CardTitle>
+          {/* Card de Estado Promedio - MEJORADO */}
+          <Card className="hover:shadow-xl transition-all duration-300 border-l-4 border-l-purple-500">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardDescription className="text-xs font-medium uppercase tracking-wide">Tu estado promedio</CardDescription>
+                <Heart className="h-5 w-5 text-purple-500" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-600">Últimos 30 días</p>
-                <span className="text-3xl">📊</span>
+              <div className="flex items-end justify-between">
+                <div>
+                  <div className={`text-5xl font-bold ${typeof avgMood === 'number' ? getMoodColor(parseFloat(avgMood)) : 'text-gray-400'}`}>
+                    {avgMood}
+                    <span className="text-2xl text-gray-400">/10</span>
+                  </div>
+                  <div className="flex items-center mt-2 space-x-2">
+                    <TrendIcon className={`h-4 w-4 ${moodTrend.color}`} />
+                    <span className={`text-sm font-medium ${moodTrend.color}`}>
+                      {moodTrend.text}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-5xl opacity-50">
+                  {typeof avgMood === 'number' ? getMoodEmoji(parseFloat(avgMood)) : '📊'}
+                </div>
               </div>
+              <p className="text-xs text-gray-500 mt-3">Últimos 30 días</p>
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-3">
-              <CardDescription>Registros totales</CardDescription>
-              <CardTitle className="text-4xl text-blue-600">{moods.length}</CardTitle>
+          {/* Card de Registros Totales - MEJORADO */}
+          <Card className="hover:shadow-xl transition-all duration-300 border-l-4 border-l-blue-500">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardDescription className="text-xs font-medium uppercase tracking-wide">Entradas registradas</CardDescription>
+                <MessageCircle className="h-5 w-5 text-blue-500" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-600">Entradas guardadas</p>
-                <span className="text-3xl">📝</span>
+              <div className="flex items-end justify-between">
+                <div>
+                  <div className="text-5xl font-bold text-blue-600">
+                    {moods.length}
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">
+                    {moods.length === 0 ? 'Aún sin registros' : 
+                     moods.length === 1 ? 'Primera entrada' :
+                     `+${Math.min(5, moods.length)} recientes`}
+                  </p>
+                </div>
+                <div className="text-5xl opacity-50">📝</div>
               </div>
+              <p className="text-xs text-gray-500 mt-3">Check-ins guardados</p>
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-3">
-              <CardDescription>Días activo</CardDescription>
-              <CardTitle className="text-4xl text-orange-600">{daysActive}</CardTitle>
+          {/* Card de Días Activo - MEJORADO */}
+          <Card className="hover:shadow-xl transition-all duration-300 border-l-4 border-l-orange-500">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardDescription className="text-xs font-medium uppercase tracking-wide">Racha activa</CardDescription>
+                <Calendar className="h-5 w-5 text-orange-500" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-600">Desde que te registraste</p>
-                <span className="text-3xl">🔥</span>
+              <div className="flex items-end justify-between">
+                <div>
+                  <div className="text-5xl font-bold text-orange-600">
+                    {daysActive}
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">
+                    {daysActive === 0 ? '¡Bienvenido!' :
+                     daysActive === 1 ? 'Primer día' :
+                     daysActive < 7 ? 'Esta semana' :
+                     daysActive < 30 ? 'Este mes' :
+                     `${Math.floor(daysActive / 30)} meses`}
+                  </p>
+                </div>
+                <div className="text-5xl opacity-50">🔥</div>
               </div>
+              <p className="text-xs text-gray-500 mt-3">Desde {new Date(userData.fecha_registro).toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })}</p>
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-shadow bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
-            <CardHeader className="pb-3">
-              <CardDescription>Nivel de confianza</CardDescription>
-              <CardTitle className="text-4xl text-purple-600">{trustLevel.nivel_confianza}/5</CardTitle>
+          {/* Card de Nivel de Confianza - MEJORADO */}
+          <Card className="hover:shadow-xl transition-all duration-300 border-l-4 border-l-purple-600 bg-gradient-to-br from-purple-50/50 to-pink-50/50">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardDescription className="text-xs font-medium uppercase tracking-wide">Nivel de confianza</CardDescription>
+                <Award className="h-5 w-5 text-purple-600" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-600">{trustLevel.nivel_nombre}</p>
-                <span className="text-3xl">🤝</span>
+              <div className="flex items-end justify-between">
+                <div>
+                  <div className="text-5xl font-bold text-purple-600">
+                    {trustLevel.nivel_confianza}
+                    <span className="text-2xl text-gray-400">/5</span>
+                  </div>
+                  <p className="text-sm font-semibold text-purple-700 mt-2">
+                    {trustLevel.nivel_nombre}
+                  </p>
+                </div>
+                <div className="text-5xl opacity-50">🤝</div>
               </div>
               {!trustLevel.es_nivel_maximo && trustLevel.mensajes_hasta_siguiente_nivel > 0 && (
-                <div className="mt-2">
-                  <div className="w-full bg-purple-200 rounded-full h-2">
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-purple-700">Progreso</span>
+                    <span className="text-xs text-gray-500">
+                      {Math.max(0, 10 - trustLevel.mensajes_hasta_siguiente_nivel)}/10
+                    </span>
+                  </div>
+                  <div className="w-full bg-purple-200 rounded-full h-2.5">
                     <div
-                      className="bg-purple-600 h-2 rounded-full transition-all"
+                      className="bg-gradient-to-r from-purple-600 to-pink-600 h-2.5 rounded-full transition-all duration-500"
                       style={{
                         width: `${Math.min(100, ((10 - trustLevel.mensajes_hasta_siguiente_nivel) / 10) * 100)}%`
                       }}
                     ></div>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {trustLevel.mensajes_hasta_siguiente_nivel} mensajes para siguiente nivel
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    {trustLevel.mensajes_hasta_siguiente_nivel} {trustLevel.mensajes_hasta_siguiente_nivel === 1 ? 'mensaje' : 'mensajes'} para subir
+                  </p>
+                </div>
+              )}
+              {trustLevel.es_nivel_maximo && (
+                <div className="mt-3 flex items-center space-x-1">
+                  <Sparkles className="h-4 w-4 text-yellow-500" />
+                  <span className="text-xs font-medium text-purple-700">¡Nivel máximo!</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* SECCIÓN DE GRÁFICOS - MEJORADA */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Activity className="h-5 w-5 text-purple-600" />
+                    <span>Tendencia de ánimo</span>
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    Evolución de tus estados emocionales
+                  </CardDescription>
+                </div>
+                {userData.weekly_data && userData.weekly_data.length > 0 && (
+                  <Badge className="bg-green-100 text-green-800 border-green-300">
+                    ✓ Datos reales
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <MoodTrendChart data={weeklyTrend} />
+              {(!userData.weekly_data || userData.weekly_data.length === 0) && (
+                <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                  <p className="text-sm text-orange-800 font-medium">📊 Sin datos suficientes</p>
+                  <p className="text-xs text-orange-600 mt-1">
+                    Registra tu ánimo durante una semana para ver tendencias
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Target className="h-5 w-5 text-pink-600" />
+                    <span>Actividades completadas</span>
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    Hábitos y check-ins realizados
+                  </CardDescription>
+                </div>
+                {userData.weekly_data && userData.weekly_data.length > 0 && (
+                  <Badge className="bg-green-100 text-green-800 border-green-300">
+                    ✓ Datos reales
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ActivitiesChart data={weeklyTrend} />
+              {(!userData.weekly_data || userData.weekly_data.length === 0) && (
+                <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                  <p className="text-sm text-orange-800 font-medium">🎯 Sin actividades aún</p>
+                  <p className="text-xs text-orange-600 mt-1">
+                    Completa hábitos para ver tu progreso semanal
                   </p>
                 </div>
               )}
@@ -260,90 +411,62 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>Tendencia de ánimo</span>
-                {userData.weekly_data && userData.weekly_data.length > 0 && (
-                  <Badge className="bg-green-100 text-green-800 border-green-300">
-                    Datos reales
-                  </Badge>
-                )}
-              </CardTitle>
-              <CardDescription>
-                Últimos 7 días
-                {(!userData.weekly_data || userData.weekly_data.length === 0) && (
-                  <span className="text-orange-600"> - Sin datos aún</span>
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <MoodTrendChart data={weeklyTrend} />
-              {(!userData.weekly_data || userData.weekly_data.length === 0) && (
-                <p className="text-sm text-gray-500 mt-2 text-center">
-                  Registra tu ánimo para ver tendencias aquí
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>Actividades completadas</span>
-                {userData.weekly_data && userData.weekly_data.length > 0 && (
-                  <Badge className="bg-green-100 text-green-800 border-green-300">
-                    Datos reales
-                  </Badge>
-                )}
-              </CardTitle>
-              <CardDescription>
-                Hábitos y check-ins semanales
-                {(!userData.weekly_data || userData.weekly_data.length === 0) && (
-                  <span className="text-orange-600"> - Sin datos aún</span>
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ActivitiesChart data={weeklyTrend} />
-              {(!userData.weekly_data || userData.weekly_data.length === 0) && (
-                <p className="text-sm text-gray-500 mt-2 text-center">
-                  Completa actividades para ver tu progreso
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
+        {/* REGISTROS RECIENTES - MEJORADO */}
         {moods.length > 0 && (
-          <Card className="mb-8">
+          <Card className="mb-8 border-t-4 border-t-purple-500">
             <CardHeader>
-              <CardTitle>Registro reciente de estados</CardTitle>
-              <CardDescription>Tus últimas entradas emocionales</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Brain className="h-5 w-5 text-purple-600" />
+                    <span>Registro reciente de estados</span>
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    Tus últimas {Math.min(5, moods.length)} entradas emocionales
+                  </CardDescription>
+                </div>
+                <Badge variant="outline" className="text-purple-700 border-purple-300">
+                  {moods.length} total
+                </Badge>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {moods.slice(-5).reverse().map((mood, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div 
+                    key={index} 
+                    className="group flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-white rounded-xl hover:from-purple-50 hover:to-pink-50 transition-all duration-300 border border-gray-200 hover:border-purple-300 hover:shadow-md"
+                  >
                     <div className="flex items-center space-x-4">
-                      <span className="text-3xl">{getMoodEmoji(mood.nivel)}</span>
+                      <div className="text-4xl group-hover:scale-110 transition-transform">
+                        {getMoodEmoji(mood.nivel)}
+                      </div>
                       <div>
-                        <p className="font-medium text-gray-900">Nivel: {mood.nivel}/10</p>
-                        <p className="text-sm text-gray-600">
+                        <div className="flex items-center space-x-2">
+                          <span className={`text-2xl font-bold ${getMoodColor(mood.nivel)}`}>
+                            {mood.nivel}
+                          </span>
+                          <span className="text-sm text-gray-400">/10</span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-0.5">
                           {new Date(mood.timestamp).toLocaleDateString('es-ES', { 
-                            weekday: 'long', 
-                            year: 'numeric', 
-                            month: 'long', 
-                            day: 'numeric' 
+                            weekday: 'short', 
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit'
                           })}
                         </p>
                       </div>
                     </div>
                     {mood.notas_texto && (
-                      <Badge variant="outline" className="max-w-xs truncate">
-                        {mood.notas_texto}
-                      </Badge>
+                      <div className="max-w-xs">
+                        <Badge variant="outline" className="bg-white text-gray-700 border-gray-300 px-3 py-1">
+                          💭 {mood.notas_texto.length > 40 
+                            ? mood.notas_texto.substring(0, 40) + '...' 
+                            : mood.notas_texto}
+                        </Badge>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -352,49 +475,76 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        <Card className="bg-gradient-to-br from-purple-100 to-pink-100 border-purple-200">
+        {/* PRÓXIMAS FUNCIONES - MEJORADO */}
+        <Card className="bg-gradient-to-br from-purple-50 via-pink-50 to-orange-50 border-2 border-purple-200 mb-8">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <span>🚧</span>
-              <span>Próximamente</span>
+              <Sparkles className="h-6 w-6 text-purple-600" />
+              <span className="text-purple-900">Próximamente</span>
             </CardTitle>
             <CardDescription>
-              Funciones en desarrollo para mejorar tu experiencia
+              Nuevas funciones en desarrollo para mejorar tu experiencia
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-2">
-              <li className="flex items-center space-x-2">
-                <Badge>📈</Badge>
-                <span>Análisis de patrones emocionales con IA</span>
-              </li>
-              <li className="flex items-center space-x-2">
-                <Badge>💬</Badge>
-                <span>Historial completo de conversaciones</span>
-              </li>
-              <li className="flex items-center space-x-2">
-                <Badge>🎯</Badge>
-                <span>Seguimiento de objetivos y hábitos</span>
-              </li>
-              <li className="flex items-center space-x-2">
-                <Badge>📊</Badge>
-                <span>Reportes mensuales personalizados</span>
-              </li>
-            </ul>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-start space-x-3 p-3 bg-white/60 rounded-lg border border-purple-200">
+                <div className="text-2xl">📈</div>
+                <div>
+                  <h4 className="font-semibold text-gray-900">Análisis de patrones</h4>
+                  <p className="text-xs text-gray-600 mt-1">IA detectará tus patrones emocionales y te dará insights personalizados</p>
+                </div>
+              </div>
+              <div className="flex items-start space-x-3 p-3 bg-white/60 rounded-lg border border-pink-200">
+                <div className="text-2xl">💬</div>
+                <div>
+                  <h4 className="font-semibold text-gray-900">Historial completo</h4>
+                  <p className="text-xs text-gray-600 mt-1">Revisa todas tus conversaciones con Loki desde el principio</p>
+                </div>
+              </div>
+              <div className="flex items-start space-x-3 p-3 bg-white/60 rounded-lg border border-orange-200">
+                <div className="text-2xl">🎯</div>
+                <div>
+                  <h4 className="font-semibold text-gray-900">Seguimiento de objetivos</h4>
+                  <p className="text-xs text-gray-600 mt-1">Define metas y visualiza tu progreso hacia ellas</p>
+                </div>
+              </div>
+              <div className="flex items-start space-x-3 p-3 bg-white/60 rounded-lg border border-blue-200">
+                <div className="text-2xl">📊</div>
+                <div>
+                  <h4 className="font-semibold text-gray-900">Reportes mensuales</h4>
+                  <p className="text-xs text-gray-600 mt-1">Recibe resúmenes automáticos de tu bienestar emocional</p>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
-        <div className="mt-8 text-center text-gray-600">
-          <p className="mb-2">Sigue usando Loki por WhatsApp para generar más datos 💬</p>
-          <a 
-            href="https://wa.me/14155238886?text=Hola%20Loki" 
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center space-x-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-lg transition-colors"
-          >
-            <span>💬</span>
-            <span>Abrir WhatsApp</span>
-          </a>
+        {/* FOOTER CTA - MEJORADO */}
+        <div className="text-center">
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-8 border-2 border-green-200">
+            <div className="max-w-2xl mx-auto">
+              <div className="text-5xl mb-4">💚</div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                Sigue tu camino hacia el bienestar
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Usa Loki por WhatsApp todos los días para generar más insights sobre tu salud emocional
+              </p>
+              <a 
+                href="https://wa.me/14155238886?text=Hola%20Loki" 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center space-x-3 px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                <MessageCircle className="h-5 w-5" />
+                <span>Abrir chat con Loki</span>
+              </a>
+              <p className="text-xs text-gray-500 mt-4">
+                Tus datos están seguros y son privados 🔒
+              </p>
+            </div>
+          </div>
         </div>
       </main>
     </div>
