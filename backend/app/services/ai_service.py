@@ -755,7 +755,25 @@ Ejemplos:
         """
         Genera respuestas basadas en reglas mientras no tengamos la API configurada.
         """
-        # Si detectamos un nivel de ánimo
+        import random
+        
+        mensaje_lower = mensaje.lower().strip()
+        
+        # 1. Detectar saludos simples
+        saludos = ['hola', 'hey', 'hi', 'hello', 'buenas', 'buenos días', 'buenas tardes', 'buenas noches', 'qué tal', 'que tal']
+        es_saludo = any(saludo in mensaje_lower for saludo in saludos)
+        
+        # Si es solo un saludo (sin más contexto)
+        if es_saludo and len(mensaje_lower.split()) <= 3:
+            respuestas_saludo = [
+                f"Hola {nombre}! ¿Cómo estás?",
+                f"Hey {nombre}! ¿Qué tal tu día?",
+                f"Hola {nombre}! ¿Cómo te va?",
+                f"Hey {nombre}! ¿Cómo te sientes hoy?",
+            ]
+            return random.choice(respuestas_saludo)
+        
+        # 2. Si detectamos un nivel de ánimo
         if context['mood_level']:
             nivel = context['mood_level']
             if nivel >= 8:
@@ -767,12 +785,12 @@ Ejemplos:
             else:
                 return f"Lamento que estés pasando por un momento difícil, {nombre}. ¿Quieres contarme qué está pasando?"
         
-        # Si mencionó hábitos
+        # 3. Si mencionó hábitos
         if context['habits_mentioned']:
             habitos = ', '.join(context['habits_mentioned'])
             return f"Genial que hayas hecho {habitos} hoy. ¿Cómo te sientes después de eso?"
         
-        # Si hay disparadores emocionales
+        # 4. Si hay disparadores emocionales
         if context['emotional_triggers']:
             trigger = context['emotional_triggers'][0]
             if trigger in ['estrés', 'ansiedad']:
@@ -780,14 +798,13 @@ Ejemplos:
             elif trigger == 'alegría':
                 return f"¡Me encanta tu energía! ¿Qué te tiene tan bien hoy?"
         
-        # Respuesta genérica empática
+        # 5. Respuesta genérica empática (solo si no es saludo)
         mensajes_genericos = [
             f"Cuéntame más, {nombre}. ¿Cómo ha estado tu día?",
-            f"Gracias por compartir eso, {nombre}. ¿Cómo te sientes en este momento del 1 al 10?",
-            f"Interesante, {nombre}. ¿Hay algo más que quieras compartir sobre cómo te sientes?",
+            f"¿Qué tal tu día, {nombre}?",
+            f"Interesante. ¿Cómo te sientes hoy?",
         ]
         
-        import random
         return random.choice(mensajes_genericos)
     
     def _needs_followup(self, context: Dict) -> bool:
