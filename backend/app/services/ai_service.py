@@ -316,23 +316,24 @@ Ejemplos:
             'si', 'no', 'ok', 'vale', 'que', 'como', 'cuando', 'donde', 'quien',
             'estoy', 'soy', 'eres', 'estás', 'está', 'tal', 'genial', 'perfecto',
             'regular', 'más', 'menos', 'muy', 'poco', 'mucho', 'nada', 'algo',
-            'debes', 'llamarme', 'nombre', 'recordarlo', 'recoerdarlo', 'por',
-            'ahora', 'ya', 'ahí', 'aqui', 'aquí', 'entonces', 'luego', 'después'
+            'debes', 'llamarme', 'nombre', 'recordarlo', 'recoerdarlo', 'recuerdalo', 
+            'recuérdalo', 'por', 'ahora', 'ya', 'ahí', 'aqui', 'aquí', 'entonces', 
+            'luego', 'después', 'favor', 'please', 'pls'
         }
         
         # Patrones comunes de presentación (con tolerancia a errores de tipeo)
         patterns = [
             # "me llamo", "me yamo", "me allmo" (errores comunes)
-            r'(?:me\s+(?:ll[aá]mo|y[aá]mo|[aá]llmo|[aá]lmo))\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)',
-            # "mi nombre es" (flexible, permite texto antes)
-            r'mi\s+nombre\s+es\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)',
-            # "nombre es X" o "nombre, es X"
-            r'nombre\s*[,:]?\s*es\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)',
+            r'(?:me\s+(?:ll[aá]mo|y[aá]mo|[aá]llmo|[aá]lmo))\s+([a-záéíóúñ]+)',
+            # "mi nombre es" - SOLO 1 palabra para evitar "diego recuerdalo"
+            r'mi\s+nombre\s+es\s+([a-záéíóúñ]+)(?:\s+(?:recuerdalo|recuérdalo|recordarlo))?',
+            # "nombre es X" o "nombre, es X" - SOLO 1 palabra
+            r'nombre\s*[,:]?\s*es\s+([a-záéíóúñ]+)(?:\s+(?:recuerdalo|recuérdalo|recordarlo))?',
             # "registra mi nombre" seguido de nombre
             r'registra(?:\s+mi)?\s+nombre[,:\s]+(?:es\s+)?([a-záéíóúñ]+)',
             # "cambialo de X a Y" o "cambia de X a Y"
             r'cambia(?:lo|r)?(?:\s+(?:de|mi\s+nombre))?(?:\s+de\s+\w+)?\s+a\s+([a-záéíóúñ]+)',
-            # "soy X" (al inicio)
+            # "soy X" (al inicio) - permite 2 palabras para nombres compuestos
             r'^soy\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)$',
             # "puedes decirme/llamame/dime X"
             r'(?:puedes\s+decirme|dime|ll[áa]mame|llamame)\s+([a-záéíóúñ]+)',
@@ -428,26 +429,66 @@ Ejemplos:
     def extract_habits_mentioned(self, mensaje: str) -> List[str]:
         """
         Extrae hábitos mencionados en el mensaje usando NLP básico.
+        Detecta si la acción es pasado (completado) o futuro/intención.
+        
+        Returns:
+            Lista de tuplas (habito, tiempo_verbal) donde tiempo_verbal es 'pasado' o 'futuro'
         """
         habitos_detectados = []
         mensaje_lower = mensaje.lower()
         
+        # Palabras que indican tiempo FUTURO (intención, no completado)
+        indicadores_futuro = ['debo', 'tengo que', 'voy a', 'quiero', 'necesito', 'debería', 'planeo', 'voy']
+        
+        # Detectar si el mensaje indica futuro
+        es_futuro = any(indicador in mensaje_lower for indicador in indicadores_futuro)
+        
         # Diccionario de palabras clave por categoría de hábito
         habitos_keywords = {
-            'ejercicio': ['ejercicio', 'gym', 'gimnasio', 'correr', 'corri', 'entrenar', 'entrené', 'deporte', 'caminar', 'caminé', 'yoga'],
-            'sueño': ['dormir', 'dormí', 'dormi', 'sueño', 'descansar', 'descansé', 'descanso', 'siesta'],
-            'social': ['amigos', 'salir', 'salí', 'sali', 'reunión', 'reunion', 'familia', 'pareja', 'cita'],
-            'trabajo': ['trabajo', 'trabajé', 'trabajar', 'oficina', 'reunión de trabajo', 'proyecto', 'deadline'],
-            'meditación': ['meditar', 'medité', 'meditación', 'mindfulness', 'respirar'],
-            'lectura': ['leer', 'leí', 'lei', 'libro', 'lectura'],
-            'alimentación': ['comer', 'comí', 'comida', 'desayuno', 'almuerzo', 'cena', 'cocinar', 'cociné'],
+            'ejercicio': {
+                'pasado': ['entrené', 'ejercité', 'corrí', 'caminé', 'nadé', 'fui al gym'],
+                'general': ['ejercicio', 'gym', 'gimnasio', 'correr', 'entrenar', 'deporte', 'caminar', 'yoga']
+            },
+            'sueño': {
+                'pasado': ['dormí', 'descansé'],
+                'general': ['dormir', 'sueño', 'descansar', 'descanso', 'siesta']
+            },
+            'social': {
+                'pasado': ['salí', 'vi a', 'visité'],
+                'general': ['amigos', 'salir', 'reunión', 'reunion', 'familia', 'pareja', 'cita']
+            },
+            'trabajo': {
+                'pasado': ['trabajé', 'terminé'],
+                'general': ['trabajo', 'trabajar', 'oficina', 'reunión de trabajo', 'proyecto', 'deadline']
+            },
+            'meditación': {
+                'pasado': ['medité'],
+                'general': ['meditar', 'meditación', 'mindfulness', 'respirar']
+            },
+            'lectura': {
+                'pasado': ['leí'],
+                'general': ['leer', 'libro', 'lectura']
+            },
+            'alimentación': {
+                'pasado': ['comí', 'desayuné', 'almorcé', 'cené', 'cociné'],
+                'general': ['comer', 'comida', 'desayuno', 'almuerzo', 'cena', 'cocinar']
+            },
         }
         
-        for habito, keywords in habitos_keywords.items():
-            for keyword in keywords:
+        for habito, keywords_dict in habitos_keywords.items():
+            # Primero buscar formas en pasado (tienen prioridad)
+            for keyword in keywords_dict.get('pasado', []):
                 if keyword in mensaje_lower:
-                    habitos_detectados.append(habito)
-                    break  # Solo agregamos cada hábito una vez
+                    habitos_detectados.append({'habito': habito, 'tiempo': 'pasado', 'keyword': keyword})
+                    break
+            else:
+                # Si no hay pasado, buscar formas generales
+                for keyword in keywords_dict['general']:
+                    if keyword in mensaje_lower:
+                        # Determinar tiempo según contexto
+                        tiempo = 'futuro' if es_futuro else 'pasado'
+                        habitos_detectados.append({'habito': habito, 'tiempo': tiempo, 'keyword': keyword})
+                        break
         
         return habitos_detectados
     
@@ -486,9 +527,12 @@ Ejemplos:
             conversation_history: Historial de mensajes anteriores para análisis de patrones
         """
         # Análisis clásicos (mantener compatibilidad)
+        habits_data = self.extract_habits_mentioned(mensaje)
+        
         context = {
             'mood_level': self.extract_mood_level(mensaje),
-            'habits_mentioned': self.extract_habits_mentioned(mensaje),
+            'habits_mentioned': [h['habito'] for h in habits_data],  # Mantener compatibilidad
+            'habits_with_tense': habits_data,  # Nueva info con tiempo verbal
             'emotional_triggers': self.extract_emotional_triggers(mensaje),
             'timestamp': datetime.utcnow().isoformat(),
         }
@@ -723,7 +767,19 @@ Ejemplos:
             if extracted_context.get('mood_level'):
                 context_info += f"\n[INFO: Usuario mencionó nivel de ánimo {extracted_context['mood_level']}/10]"
             if extracted_context.get('habits_mentioned'):
-                context_info += f"\n[INFO: Hábitos detectados: {', '.join(extracted_context['habits_mentioned'])}]"
+                # Mostrar hábitos con información de tiempo verbal
+                habits_with_tense = extracted_context.get('habits_with_tense', [])
+                if habits_with_tense:
+                    habits_pasado = [h['habito'] for h in habits_with_tense if h['tiempo'] == 'pasado']
+                    habits_futuro = [h['habito'] for h in habits_with_tense if h['tiempo'] == 'futuro']
+                    
+                    if habits_pasado:
+                        context_info += f"\n[INFO: Hábitos COMPLETADOS: {', '.join(habits_pasado)}]"
+                    if habits_futuro:
+                        context_info += f"\n[INFO: Hábitos PLANIFICADOS/INTENCIÓN: {', '.join(habits_futuro)}]"
+                else:
+                    # Fallback si no hay info de tiempo
+                    context_info += f"\n[INFO: Hábitos detectados: {', '.join(extracted_context['habits_mentioned'])}]"
             if extracted_context.get('emotional_triggers'):
                 context_info += f"\n[INFO: Disparadores emocionales: {', '.join(extracted_context['emotional_triggers'])}]"
 

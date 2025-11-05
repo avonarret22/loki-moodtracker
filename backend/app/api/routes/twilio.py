@@ -78,6 +78,16 @@ async def receive_twilio_webhook(
         usuario = crud.get_or_create_usuario(db, usuario=usuario_data)
         logger.info(f"✅ Usuario obtenido/creado: {usuario.id}")
         
+        # 🆕 DETECCIÓN Y ACTUALIZACIÓN DE NOMBRE
+        # Verificar si el mensaje contiene el nombre del usuario
+        nombre_detectado = loki_service._extract_name_from_message(message_text)
+        if nombre_detectado and (not usuario.nombre or usuario.nombre.startswith("Usuario ")):
+            # Actualizar nombre del usuario en BD
+            usuario.nombre = nombre_detectado
+            db.commit()
+            db.refresh(usuario)
+            logger.info(f"✅ Nombre actualizado: {nombre_detectado} para usuario {usuario.id}")
+        
         # COMANDO ESPECIAL: Dashboard
         message_lower = message_text.lower().strip()
         dashboard_keywords = ['dashboard', 'ver mi progreso', 'estadisticas', 'mis datos', 'mi dashboard']
