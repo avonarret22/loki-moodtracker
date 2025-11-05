@@ -139,6 +139,14 @@ async def receive_webhook(request: Request, db: Session = Depends(get_db)):
             usuario_id=usuario.id
         )
         
+        # 🆕 Si se detectó un nombre, actualizarlo en la BD
+        nombre_detectado = ai_response.get('nombre_detectado')
+        if nombre_detectado:
+            usuario.nombre = nombre_detectado
+            db.commit()
+            db.refresh(usuario)
+            logger.info(f"✅ Nombre actualizado a: {nombre_detectado} para usuario {usuario.id}")
+        
         # Guardar la conversación
         conversacion_data = schemas.ConversacionContextoCreate(
             mensaje_usuario=message_text,

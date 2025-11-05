@@ -291,6 +291,7 @@ Ejemplos:
         """
         Intenta extraer el nombre del usuario de su mensaje.
         Busca patrones como "Soy X", "Me llamo X", "Mi nombre es X", o simplemente "X" si es corto.
+        Tolerante a errores de tipeo.
         """
         import re
         
@@ -301,15 +302,24 @@ Ejemplos:
             'hola', 'hi', 'hello', 'hey', 'buenas', 'buenos', 'bien', 'mal', 'gracias',
             'si', 'no', 'ok', 'vale', 'que', 'como', 'cuando', 'donde', 'quien',
             'estoy', 'soy', 'eres', 'estás', 'está', 'tal', 'genial', 'perfecto',
-            'regular', 'más', 'menos', 'muy', 'poco', 'mucho', 'nada', 'algo'
+            'regular', 'más', 'menos', 'muy', 'poco', 'mucho', 'nada', 'algo',
+            'debes', 'llamarme', 'nombre', 'recordarlo', 'recoerdarlo', 'por'
         }
         
-        # Patrones comunes de presentación
+        # Patrones comunes de presentación (con tolerancia a errores de tipeo)
         patterns = [
-            r'(?:me llamo|mi nombre es)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)',
+            # "me llamo", "me yamo", "me allmo" (errores comunes)
+            r'(?:me\s+(?:ll[aá]mo|y[aá]mo|[aá]llmo|[aá]lmo))\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)',
+            # "mi nombre es"
+            r'mi\s+nombre\s+es\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)',
+            # "soy X" (al inicio)
             r'^soy\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)$',
-            r'(?:puedes decirme|dime|llamame|ll[áa]mame)\s+([a-záéíóúñ]+)',
-            r'^([a-záéíóúñ]+)$',  # Solo nombre (si es una palabra)
+            # "puedes decirme/llamame/dime X"
+            r'(?:puedes\s+decirme|dime|ll[áa]mame|llamame)\s+([a-záéíóúñ]+)',
+            # "debes llamarme X" o "llamarme X"
+            r'(?:debes\s+)?llamarme\s+(?:por\s+mi\s+nombre\s+)?([a-záéíóúñ]+)',
+            # Solo nombre (si es una palabra sola y no está en palabras comunes)
+            r'^([a-záéíóúñ]{2,20})$',
         ]
         
         for pattern in patterns:
@@ -539,6 +549,34 @@ Ejemplos:
                 }
         
         # 🎯 FLUJO NORMAL: Usuario ya tiene nombre
+        # 🆕 Pero primero verificar si está intentando actualizar su nombre
+        nombre_detectado_nuevo = self._extract_name_from_message(mensaje_usuario)
+        if nombre_detectado_nuevo and nombre_detectado_nuevo.lower() != usuario_nombre.lower():
+            # El usuario está diciendo un nombre diferente al registrado
+            logger.info(f"🔄 Usuario intentando actualizar nombre de '{usuario_nombre}' a '{nombre_detectado_nuevo}'")
+            
+            # Actualizar en BD si tenemos sesión
+            if db_session and usuario_id:
+                try:
+                    from app import crud
+                    usuario = crud.get_usuario(db_session, usuario_id)
+                    if usuario:
+                        usuario.nombre = nombre_detectado_nuevo
+                        db_session.commit()
+                        logger.info(f"✅ Nombre actualizado: {nombre_detectado_nuevo} para usuario {usuario_id}")
+                except Exception as e:
+                    logger.error(f"⚠️ Error actualizando nombre: {e}")
+                    db_session.rollback()
+            
+            # Confirmar el cambio de nombre
+            return {
+                'respuesta': f"Perfecto, {nombre_detectado_nuevo}! Te recordaré con ese nombre. ¿Cómo estás?",
+                'context_extracted': {},
+                'nombre_detectado': nombre_detectado_nuevo,
+                'esperando_nombre': False,
+                'needs_followup': False
+            }
+        
         # Preparar historial conversacional para análisis NLP
         conversation_history = []
         if contexto_reciente:
