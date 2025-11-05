@@ -21,6 +21,12 @@ test_cases = [
     "mi nombre es Diego",
     "soy Diego",
     "Diego",
+    # NUEVOS CASOS
+    "registra mi nombre, es Diego",
+    "cambialo de usuario a Diego",
+    "registra mi nombre Diego",
+    "cambia mi nombre a Diego",
+    "mi nombre es Diego ahora",
 ]
 
 print("=" * 60)

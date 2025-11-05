@@ -122,7 +122,7 @@ async def create_or_update_habits_from_mentions(
                     completado=True,
                     notas=f"Auto-registrado desde conversación: {mention}"
                 )
-                crud.create_registro_habito(db, registro_habito=registro_data, usuario_id=usuario_id)
+                crud.create_registro_habito(db, registro=registro_data, usuario_id=usuario_id)
                 
                 result['registered'].append({
                     'id': habito.id,
@@ -151,7 +151,7 @@ async def create_or_update_habits_from_mentions(
                     completado=True,
                     notas=f"Auto-creado y registrado desde conversación: {mention}"
                 )
-                crud.create_registro_habito(db, registro_habito=registro_data, usuario_id=usuario_id)
+                crud.create_registro_habito(db, registro=registro_data, usuario_id=usuario_id)
                 
                 result['created'].append({
                     'id': nuevo_habito.id,

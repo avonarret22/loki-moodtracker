@@ -1,5 +1,5 @@
 """
-Servicio de IA para procesamiento de lenguaje natural con Claude/GPT.
+Servicio de IA para procesamiento de lenguaje natural con Claude/GPT/Gemini.
 Maneja la personalidad de Loki y extrae información contextual de las conversaciones.
 """
 
@@ -8,6 +8,7 @@ import json
 import os
 from datetime import datetime
 from anthropic import Anthropic
+import google.generativeai as genai
 
 from app.core.config import settings
 from app.core.logger import setup_logger
@@ -30,26 +31,38 @@ class LokiAIService:
     def __init__(self):
         self.anthropic_key = settings.ANTHROPIC_API_KEY
         self.openai_key = settings.OPENAI_API_KEY
+        self.google_key = settings.GOOGLE_API_KEY
 
         # Modo de conversación: 'conciso' (default) o 'profundo'
         self.conversation_mode = 'conciso'
 
-        # Debug: Verificar que se cargó la key
-        print(f"[DEBUG] Anthropic API Key presente: {bool(self.anthropic_key)}")
-        if self.anthropic_key:
-            print(f"[DEBUG] Key empieza con: {self.anthropic_key[:15]}...")
-
-        # Inicializar cliente de Claude si tenemos la API key
-        if self.anthropic_key:
+        # Prioridad: Google Gemini > Anthropic Claude > Fallback
+        self.ai_provider = None
+        
+        # 1. Intentar Google Gemini primero (GRATIS)
+        if self.google_key:
+            try:
+                genai.configure(api_key=self.google_key)
+                # Usar gemini-2.5-flash (rápido, gratis y muy capaz)
+                # Crear modelo SIN system_instruction por ahora
+                self.gemini_model = genai.GenerativeModel('gemini-2.5-flash')
+                self.ai_provider = 'gemini'
+                print("[OK] ✅ Google Gemini (2.5 Flash) inicializado correctamente")
+            except Exception as e:
+                print(f"[ERROR] Error al inicializar Gemini: {e}")
+        
+        # 2. Fallback a Claude si Gemini falla
+        if not self.ai_provider and self.anthropic_key:
             try:
                 self.claude_client = Anthropic(api_key=self.anthropic_key)
-                print("[OK] Claude API inicializada correctamente")
+                self.ai_provider = 'claude'
+                print("[OK] ✅ Claude API inicializada correctamente")
             except Exception as e:
-                self.claude_client = None
                 print(f"[ERROR] Error al inicializar Claude: {e}")
-        else:
-            self.claude_client = None
-            print("[WARNING] Claude API key no encontrada, usando respuestas basadas en reglas")
+        
+        # 3. Si nada funciona, usar reglas
+        if not self.ai_provider:
+            print("[WARNING] ⚠️ No hay API de IA disponible, usando respuestas basadas en reglas")
         
     def _get_trust_based_system_prompt(self, usuario_nombre: str, nivel_confianza: int, nivel_info: Dict) -> str:
         """
@@ -303,15 +316,22 @@ Ejemplos:
             'si', 'no', 'ok', 'vale', 'que', 'como', 'cuando', 'donde', 'quien',
             'estoy', 'soy', 'eres', 'estás', 'está', 'tal', 'genial', 'perfecto',
             'regular', 'más', 'menos', 'muy', 'poco', 'mucho', 'nada', 'algo',
-            'debes', 'llamarme', 'nombre', 'recordarlo', 'recoerdarlo', 'por'
+            'debes', 'llamarme', 'nombre', 'recordarlo', 'recoerdarlo', 'por',
+            'ahora', 'ya', 'ahí', 'aqui', 'aquí', 'entonces', 'luego', 'después'
         }
         
         # Patrones comunes de presentación (con tolerancia a errores de tipeo)
         patterns = [
             # "me llamo", "me yamo", "me allmo" (errores comunes)
             r'(?:me\s+(?:ll[aá]mo|y[aá]mo|[aá]llmo|[aá]lmo))\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)',
-            # "mi nombre es"
+            # "mi nombre es" (flexible, permite texto antes)
             r'mi\s+nombre\s+es\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)',
+            # "nombre es X" o "nombre, es X"
+            r'nombre\s*[,:]?\s*es\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)',
+            # "registra mi nombre" seguido de nombre
+            r'registra(?:\s+mi)?\s+nombre[,:\s]+(?:es\s+)?([a-záéíóúñ]+)',
+            # "cambialo de X a Y" o "cambia de X a Y"
+            r'cambia(?:lo|r)?(?:\s+(?:de|mi\s+nombre))?(?:\s+de\s+\w+)?\s+a\s+([a-záéíóúñ]+)',
             # "soy X" (al inicio)
             r'^soy\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)$',
             # "puedes decirme/llamame/dime X"
@@ -327,12 +347,23 @@ Ejemplos:
             if match:
                 nombre = match.group(1).strip()
                 
+                # Limpiar palabras de parada al final del nombre
+                palabras = nombre.split()
+                # Remover palabras comunes del final
+                while palabras and palabras[-1].lower() in palabras_comunes:
+                    palabras.pop()
+                
+                if not palabras:
+                    continue
+                
+                nombre_limpio = ' '.join(palabras)
+                
                 # Verificar que no sea una palabra común
-                if nombre.lower() in palabras_comunes:
+                if nombre_limpio.lower() in palabras_comunes:
                     continue
                 
                 # Capitalizar correctamente
-                nombre_capitalizado = ' '.join(word.capitalize() for word in nombre.split())
+                nombre_capitalizado = ' '.join(word.capitalize() for word in nombre_limpio.split())
                 
                 # Validar que sea un nombre razonable (2-30 caracteres, solo letras y espacios)
                 if 2 <= len(nombre_capitalizado) <= 30 and re.match(r'^[a-záéíóúñA-ZÁÉÍÓÚÑ\s]+$', nombre_capitalizado):
@@ -628,10 +659,11 @@ Ejemplos:
             except Exception as e:
                 print(f"⚠️ Error obteniendo insights de patrones: {e}")
         
-        # Intentar generar respuesta con Claude
-        if self.claude_client:
+        # Intentar generar respuesta con IA (Gemini o Claude)
+        if self.ai_provider:
             try:
-                print(f"🤖 Generando respuesta con Claude para: '{mensaje_usuario[:50]}...'")
+                provider_name = "Gemini" if self.ai_provider == 'gemini' else "Claude"
+                print(f"🤖 Generando respuesta con {provider_name} para: '{mensaje_usuario[:50]}...'")
                 respuesta = await self._generate_claude_response(
                     mensaje_usuario,
                     usuario_nombre,
@@ -641,9 +673,9 @@ Ejemplos:
                     db_session,  # Pasar sesión para contexto histórico
                     usuario_id  # Pasar ID para contexto histórico
                 )
-                print(f"✅ Respuesta de Claude generada exitosamente")
+                print(f"✅ Respuesta de {provider_name} generada exitosamente")
             except Exception as e:
-                print(f"⚠️ Error con Claude API: {e}")
+                print(f"⚠️ Error con {self.ai_provider.upper()} API: {e}")
                 print(f"⚠️ Tipo de error: {type(e).__name__}")
                 print("⚠️ Fallback a respuestas basadas en reglas")
                 respuesta = self._generate_rule_based_response(
@@ -750,18 +782,55 @@ Ejemplos:
             "content": mensaje_completo
         })
         
-        # Llamar a Claude API
-        # Usando Claude 3 Haiku (más rápido y económico, debería estar disponible)
-        response = self.claude_client.messages.create(
-            model="claude-3-haiku-20240307",
-            max_tokens=300,  # Respuestas cortas y concisas
-            temperature=0.8,  # Un poco de creatividad pero consistente
-            system=system_prompt,
-            messages=messages
-        )
+        # Para Gemini, guardar el mensaje SIN context_info (causa bloqueos)
+        mensaje_sin_context = mensaje_usuario
         
-        # Extraer la respuesta
-        respuesta = response.content[0].text
+        # Llamar a la API de IA disponible
+        if self.ai_provider == 'gemini':
+            # Google Gemini API - Usar formato natural sin etiquetas de roleplay
+            from google.generativeai.types import HarmCategory, HarmBlockThreshold
+            
+            # Configuración de seguridad moderada
+            safety_settings = {
+                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            }
+            
+            # Formato natural que evita bloqueos de seguridad
+            # IMPORTANTE: Usar mensaje SIN context_info (los corchetes causan bloqueos)
+            # Formato simple y directo que no activa filtros
+            simple_prompt = f"{usuario_nombre} te dice: '{mensaje_sin_context}'. Responde de forma amigable y breve."
+            
+            response = self.gemini_model.generate_content(
+                simple_prompt,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=300,
+                    temperature=0.8,
+                ),
+                safety_settings=safety_settings
+            )
+            
+            # Manejar respuestas bloqueadas
+            if not response.candidates or not response.text:
+                raise Exception("Respuesta bloqueada o vacía")
+            
+            respuesta = response.text
+            
+        elif self.ai_provider == 'claude':
+            # Claude API
+            response = self.claude_client.messages.create(
+                model="claude-3-haiku-20240307",
+                max_tokens=300,
+                temperature=0.8,
+                system=system_prompt,
+                messages=messages
+            )
+            respuesta = response.content[0].text
+        else:
+            # Fallback a reglas si no hay API
+            raise Exception("No AI provider available")
         
         return respuesta
     

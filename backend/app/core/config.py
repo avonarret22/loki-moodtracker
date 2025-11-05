@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     
     OPENAI_API_KEY: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     ANTHROPIC_API_KEY: str | None = Field(default=None, validation_alias="ANTHROPIC_API_KEY")
+    GOOGLE_API_KEY: str | None = Field(default=None, validation_alias="GOOGLE_API_KEY")
     
     # Twilio WhatsApp Configuration
     TWILIO_ACCOUNT_SID: str | None = Field(default=None, validation_alias="TWILIO_ACCOUNT_SID")
