@@ -15,6 +15,7 @@ from app.services.nlp_service import nlp_service
 from app.services.memory_service import memory_service
 from app.services.trust_level_service import trust_service
 from app.services.emotional_memory_service import emotional_memory_service
+from app.services.progress_tracker_service import progress_tracker_service
 
 logger = setup_logger(__name__)
 
@@ -207,6 +208,8 @@ Ejemplos:
         """
         Construye el prompt del sistema basado en el nivel de confianza del usuario.
         Adapta automáticamente la personalidad según la relación.
+        
+        🆕 Ahora incluye insights de progreso cuando se detectan.
         """
         # Obtener nivel de confianza del usuario
         nivel_confianza = 1
@@ -221,6 +224,25 @@ Ejemplos:
 
         # Construir prompt base según nivel de confianza
         prompt = self._get_trust_based_system_prompt(usuario_nombre, nivel_confianza, nivel_info)
+
+        # 📈 NUEVO: Agregar insights de progreso si se detectan
+        if db_session and usuario_id and nivel_confianza >= 2:
+            try:
+                progress_insight = progress_tracker_service.get_progress_insights(
+                    db_session,
+                    usuario_id,
+                    incluir_en_prompt=True
+                )
+                
+                if progress_insight:
+                    celebration_context = progress_tracker_service.generate_celebration_context(
+                        progress_insight,
+                        nivel_confianza
+                    )
+                    prompt += f"\n\n### PROGRESO DETECTADO:\n{celebration_context}\n"
+                    logger.info(f"📈 Progreso incluido en prompt: {progress_insight.tipo}")
+            except Exception as e:
+                logger.error(f"⚠️ Error obteniendo insights de progreso: {e}")
 
         # Agregar contexto histórico de largo plazo solo si el nivel de confianza es alto (3+)
         if db_session and usuario_id and nivel_confianza >= 3:
