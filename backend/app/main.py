@@ -16,10 +16,29 @@ from app.api.routes.patterns import router as patterns_router
 from app.api.routes.dashboard import router as dashboard_router  # Dashboard temporal
 from app.core.config import settings
 from app.core.logger import setup_logger
+from app.core.sentry import init_sentry
+from app.core.logging_config import setup_logging, set_audit_logger, get_logger
+from app.core.logging_middleware import RequestLoggingMiddleware, SlowRequestMiddleware
 from app.db.session import engine
 from app.models import mood
 
-logger = setup_logger(__name__)
+# Inicializar sistema de logging estructurado
+environment = 'production' if settings.ENV == 'production' else 'development'
+_, audit_logger = setup_logging(
+    environment=environment,
+    log_level=settings.LOG_LEVEL if hasattr(settings, 'LOG_LEVEL') else 'INFO',
+    enable_console=True,
+    enable_file=True,
+    enable_audit=True,
+)
+if audit_logger:
+    set_audit_logger(audit_logger)
+
+# Logger para este módulo
+logger = get_logger(__name__)
+
+# Initialize Sentry for error tracking
+init_sentry()
 
 
 def create_app() -> FastAPI:
@@ -34,6 +53,11 @@ def create_app() -> FastAPI:
     limiter = Limiter(key_func=get_remote_address)
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    # ===== Middlewares de Logging =====
+    # Agregar middlewares de logging (ANTES de CORS)
+    app.add_middleware(SlowRequestMiddleware, threshold_ms=1000)  # Warn si >1s
+    app.add_middleware(RequestLoggingMiddleware)  # Loggea todas las requests
 
     # Configurar CORS de forma restrictiva
     app.add_middleware(

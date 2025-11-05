@@ -5,6 +5,7 @@ El nivel de confianza determina cómo Loki se comunica: de reservado a cercano.
 from sqlalchemy.orm import Session
 from app.models.mood import Usuario
 from typing import Dict, Optional
+from app.core.caching import cached_trust_level, invalidate_trust_level_cache
 
 
 class TrustLevelService:
@@ -109,6 +110,9 @@ class TrustLevelService:
 
         db.commit()
 
+        # Invalidar cache de trust level al actualizar
+        invalidate_trust_level_cache(usuario_id)
+
         # Detectar si hubo cambio de nivel (para celebrar o notificar)
         nivel_cambio = nivel_nuevo > nivel_anterior
 
@@ -133,17 +137,24 @@ class TrustLevelService:
         """
         return self.TRUST_LEVELS.get(nivel, self.TRUST_LEVELS[1])
 
-    def get_user_trust_info(self, db: Session, usuario_id: int) -> Optional[Dict]:
+    @cached_trust_level
+    def get_user_trust_info(self, usuario_id: int, db: Session = None) -> Optional[Dict]:
         """
         Obtiene información completa del nivel de confianza de un usuario.
+        
+        NOTA: db debe ser pasado como kwarg para que el decorator funcione.
+        La firma tiene usuario_id primero para compatibilidad con el decorator.
 
         Args:
-            db: Sesión de base de datos
             usuario_id: ID del usuario
+            db: Sesión de base de datos (debe pasarse como kwarg)
 
         Returns:
             Diccionario con información completa o None si no existe
         """
+        if db is None:
+            raise ValueError("db session is required")
+            
         usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
         if not usuario:
             return None

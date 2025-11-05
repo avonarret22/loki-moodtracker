@@ -1,20 +1,24 @@
 """
 Endpoints de autenticación para acceso al dashboard.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func, cast, Integer
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 from collections import defaultdict
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.db.session import get_db
 from app.services.auth_service import auth_service
 from app.services.trust_level_service import trust_service
 from app.crud import mood as crud
 from app.models.mood import EstadoAnimo, RegistroHabito
+from app.core.rate_limits import get_rate_limit
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
 class TokenResponse(BaseModel):
@@ -39,12 +43,16 @@ class TokenVerifyResponse(BaseModel):
 
 
 @router.post("/generate-token/{telefono}", response_model=TokenResponse)
+@limiter.limit(get_rate_limit("auth"))
 async def generate_dashboard_token(
+    request: Request,
     telefono: str,
     db: Session = Depends(get_db)
 ):
     """
     Genera un token de acceso al dashboard para un usuario.
+    
+    **Rate limit**: 5 solicitudes por minuto por IP.
     
     Este endpoint es llamado internamente cuando un usuario solicita
     ver su dashboard desde WhatsApp.
@@ -86,22 +94,26 @@ async def generate_dashboard_token(
 
 
 @router.post("/verify-token", response_model=TokenVerifyResponse)
+@limiter.limit(get_rate_limit("auth_verify"))
 async def verify_dashboard_token(
-    request: TokenVerifyRequest
+    request: Request,
+    token_request: TokenVerifyRequest
 ):
     """
     Verifica si un token es válido y retorna la información del usuario.
+    
+    **Rate limit**: 20 solicitudes por minuto por IP.
     
     Este endpoint será usado por el frontend del dashboard para
     validar tokens cuando un usuario accede.
     
     Args:
-        request: Request con el token a verificar
+        token_request: Request con el token a verificar
         
     Returns:
         Información de validez y datos del usuario
     """
-    token_data = auth_service.verify_token(request.token)
+    token_data = auth_service.verify_token(token_request.token)
     
     if not token_data:
         return TokenVerifyResponse(valid=False)
@@ -226,8 +238,8 @@ async def get_current_user(
         for estado in estados_animo
     ]
 
-    # Obtener información del nivel de confianza
-    trust_info = trust_service.get_user_trust_info(db, usuario_id)
+    # Obtener información del nivel de confianza (usando cache)
+    trust_info = trust_service.get_user_trust_info(usuario_id, db=db)
 
     # Obtener datos semanales para gráficos
     weekly_data = _get_weekly_data(db, usuario_id)

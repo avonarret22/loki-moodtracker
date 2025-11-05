@@ -161,11 +161,26 @@ async def receive_webhook(request: Request, db: Session = Depends(get_db)):
             )
             crud.create_estado_animo(db, estado_animo=estado_animo_data, usuario_id=usuario.id)
         
-        # Si se detectaron hábitos, registrarlos (opcional: crear/actualizar hábitos automáticamente)
+        # Si se detectaron hábitos, registrarlos automáticamente
         habits_mentioned = ai_response['context_extracted'].get('habits_mentioned', [])
         if habits_mentioned:
-            # TODO: Implementar lógica para crear/actualizar hábitos automáticamente
-            pass
+            from app.services.habit_automation import create_or_update_habits_from_mentions, get_habit_summary
+            
+            try:
+                habits_result = await create_or_update_habits_from_mentions(
+                    db=db,
+                    usuario_id=usuario.id,
+                    habits_mentioned=habits_mentioned
+                )
+                
+                # Log del resultado
+                summary = get_habit_summary(habits_result)
+                if summary:
+                    logger.info(f"Hábitos auto-gestionados para {phone_number}: {summary}")
+                    
+            except Exception as e:
+                logger.error(f"Error auto-gestionando hábitos: {e}")
+                # No fallar el flujo principal si hay error en hábitos
         
         # Enviar respuesta por WhatsApp
         await whatsapp_service.send_message(

@@ -1,7 +1,13 @@
-from pydantic import BaseModel, Field, validator, constr
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from datetime import datetime
 from typing import Optional
 import re
+from app.core.validation import (
+    sanitize_user_input,
+    sanitize_phone_number,
+    validate_no_sql_injection,
+    validate_no_xss
+)
 
 
 # ===== EstadoAnimo Schemas =====
@@ -9,15 +15,19 @@ class EstadoAnimoBase(BaseModel):
     nivel: int = Field(..., ge=1, le=10, description="Nivel de ánimo entre 1 y 10")
     notas_texto: Optional[str] = Field(None, max_length=5000, description="Notas del usuario")
 
-    @validator('notas_texto')
+    @field_validator('notas_texto')
+    @classmethod
     def sanitize_notas(cls, v):
         if v is None:
             return v
-        # Sanitizar HTML básico
-        v = v.replace('<', '&lt;').replace('>', '&gt;')
-        # Limitar caracteres especiales peligrosos
-        v = re.sub(r'[<>]', '', v)
-        return v.strip()[:5000]  # Hard limit
+        # Usar sanitización centralizada con validaciones completas
+        return sanitize_user_input(
+            v,
+            max_length=5000,
+            allow_html=False,
+            check_sql=True,
+            check_xss=True
+        )
 
 
 class EstadoAnimoCreate(EstadoAnimoBase):
@@ -25,14 +35,13 @@ class EstadoAnimoCreate(EstadoAnimoBase):
 
 
 class EstadoAnimo(EstadoAnimoBase):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     usuario_id: int
     timestamp: datetime
     contexto_extraido: Optional[str] = None
     disparadores_detectados: Optional[str] = None
-
-    class Config:
-        orm_mode = True
 
 
 # ===== Usuario Schemas =====
@@ -40,13 +49,16 @@ class UsuarioBase(BaseModel):
     nombre: str = Field(..., min_length=2, max_length=100, description="Nombre del usuario")
     telefono: str = Field(
         ...,
-        regex=r'^\+?[1-9]\d{1,14}$',  # E.164 format
+        pattern=r'^\+?[1-9]\d{1,14}$',  # E.164 format (regex -> pattern en Pydantic v2)
         description="Teléfono en formato internacional"
     )
-    timezone: Optional[str] = Field("UTC", max_length=50)
+    timezone: Optional[str] = Field(default="UTC", max_length=50)
 
-    @validator('nombre')
+    @field_validator('nombre')
+    @classmethod
     def sanitize_nombre(cls, v):
+        # Usar sanitización centralizada
+        v = sanitize_user_input(v, max_length=100, check_sql=True, check_xss=True)
         # Permitir solo letras, espacios, guiones y apóstrofes
         v = re.sub(r'[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s\-\']', '', v)
         v = v.strip()
@@ -54,12 +66,11 @@ class UsuarioBase(BaseModel):
             raise ValueError('El nombre debe tener al menos 2 caracteres')
         return v
 
-    @validator('telefono')
+    @field_validator('telefono')
+    @classmethod
     def normalize_telefono(cls, v):
-        # Normalizar formato E.164
-        v = re.sub(r'[^\d+]', '', v)  # Remover todo excepto dígitos y +
-        if not v.startswith('+'):
-            v = '+' + v
+        # Usar función centralizada de sanitización de teléfonos
+        v = sanitize_phone_number(v)
         if len(v) < 10 or len(v) > 16:
             raise ValueError('Número de teléfono inválido')
         return v
@@ -70,6 +81,8 @@ class UsuarioCreate(UsuarioBase):
 
 
 class Usuario(UsuarioBase):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     nivel_CMV: str
     preferencias_tracking: str
@@ -78,33 +91,29 @@ class Usuario(UsuarioBase):
     nivel_confianza: Optional[int] = 1
     total_interacciones: Optional[int] = 0
 
-    class Config:
-        orm_mode = True
-
 
 # ===== Habito Schemas =====
 class HabitoBase(BaseModel):
     nombre_habito: str = Field(..., min_length=1, max_length=200, description="Nombre del hábito")
     categoria: Optional[str] = Field(None, max_length=100)
-    objetivo_semanal: Optional[int] = Field(0, ge=0, le=50, description="Objetivo semanal (0-50)")
+    objetivo_semanal: Optional[int] = Field(default=0, ge=0, le=50, description="Objetivo semanal (0-50)")
     activo: Optional[bool] = True
 
-    @validator('nombre_habito')
+    @field_validator('nombre_habito')
+    @classmethod
     def sanitize_nombre_habito(cls, v):
-        # Sanitizar y normalizar
-        v = v.strip()
-        v = re.sub(r'[<>]', '', v)  # Remover HTML tags
+        # Usar sanitización centralizada completa
+        v = sanitize_user_input(v, max_length=200, check_sql=True, check_xss=True)
         if len(v) < 1:
             raise ValueError('El nombre del hábito no puede estar vacío')
-        return v[:200]  # Hard limit
+        return v
 
-    @validator('categoria')
+    @field_validator('categoria')
+    @classmethod
     def sanitize_categoria(cls, v):
         if v is None:
             return v
-        v = v.strip()
-        v = re.sub(r'[<>]', '', v)
-        return v[:100]
+        return sanitize_user_input(v, max_length=100, check_sql=True, check_xss=True)
 
 
 class HabitoCreate(HabitoBase):
@@ -117,24 +126,23 @@ class HabitoUpdate(BaseModel):
     objetivo_semanal: Optional[int] = Field(None, ge=0, le=50)
     activo: Optional[bool] = None
 
-    @validator('nombre_habito')
+    @field_validator('nombre_habito')
+    @classmethod
     def sanitize_nombre_habito(cls, v):
         if v is None:
             return v
-        v = v.strip()
-        v = re.sub(r'[<>]', '', v)
+        v = sanitize_user_input(v, max_length=200, check_sql=True, check_xss=True)
         if len(v) < 1:
             raise ValueError('El nombre del hábito no puede estar vacío')
-        return v[:200]
+        return v
 
 
 class Habito(HabitoBase):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     usuario_id: int
     fecha_creacion: datetime
-
-    class Config:
-        orm_mode = True
 
 
 # ===== RegistroHabito Schemas =====
@@ -143,12 +151,12 @@ class RegistroHabitoBase(BaseModel):
     completado: Optional[bool] = True
     notas: Optional[str] = Field(None, max_length=1000)
 
-    @validator('notas')
+    @field_validator('notas')
+    @classmethod
     def sanitize_notas(cls, v):
         if v is None:
             return v
-        v = v.replace('<', '&lt;').replace('>', '&gt;')
-        return v.strip()[:1000]
+        return sanitize_user_input(v, max_length=1000, check_sql=True, check_xss=True)
 
 
 class RegistroHabitoCreate(RegistroHabitoBase):
@@ -156,12 +164,11 @@ class RegistroHabitoCreate(RegistroHabitoBase):
 
 
 class RegistroHabito(RegistroHabitoBase):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     usuario_id: int
     timestamp: datetime
-
-    class Config:
-        orm_mode = True
 
 
 # ===== ConversacionContexto Schemas =====
@@ -171,21 +178,28 @@ class ConversacionContextoBase(BaseModel):
     entidades_extraidas: Optional[str] = Field(None, max_length=5000)
     categorias_detectadas: Optional[str] = Field(None, max_length=1000)
 
-    @validator('mensaje_usuario')
+    @field_validator('mensaje_usuario')
+    @classmethod
     def validate_mensaje(cls, v):
-        # Sanitizar HTML
-        v = v.replace('<', '&lt;').replace('>', '&gt;')
-        # Validar que no sea solo espacios
+        # Usar sanitización centralizada completa
+        v = sanitize_user_input(v, max_length=2000, check_sql=True, check_xss=True)
         if not v.strip():
             raise ValueError('El mensaje no puede estar vacío')
-        return v.strip()[:2000]  # Hard limit
+        return v
 
-    @validator('respuesta_loki', 'entidades_extraidas', 'categorias_detectadas')
+    @field_validator('respuesta_loki', 'entidades_extraidas', 'categorias_detectadas')
+    @classmethod
     def sanitize_text_fields(cls, v):
         if v is None:
             return v
-        v = v.replace('<', '&lt;').replace('>', '&gt;')
-        return v.strip()
+        # Respuesta Loki y campos extraídos también deben sanitizarse
+        max_lengths = {
+            'respuesta_loki': 10000,
+            'entidades_extraidas': 5000,
+            'categorias_detectadas': 1000
+        }
+        # Usar 5000 como default
+        return sanitize_user_input(v, max_length=10000, check_sql=False, check_xss=True)
 
 
 class ConversacionContextoCreate(ConversacionContextoBase):
@@ -193,12 +207,11 @@ class ConversacionContextoCreate(ConversacionContextoBase):
 
 
 class ConversacionContexto(ConversacionContextoBase):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     usuario_id: int
     timestamp: datetime
-
-    class Config:
-        orm_mode = True
 
 
 # ===== Correlacion Schemas =====
@@ -208,13 +221,13 @@ class CorrelacionBase(BaseModel):
     confianza_estadistica: float = Field(..., ge=0.0, le=1.0, description="Confianza estadística (0 a 1)")
     num_datos: int = Field(..., ge=1, description="Número de datos utilizados")
 
-    @validator('factor')
+    @field_validator('factor')
+    @classmethod
     def sanitize_factor(cls, v):
-        v = v.strip()
-        v = re.sub(r'[<>]', '', v)
+        v = sanitize_user_input(v, max_length=200, check_sql=True, check_xss=True)
         if len(v) < 1:
             raise ValueError('El factor no puede estar vacío')
-        return v[:200]
+        return v
 
 
 class CorrelacionCreate(CorrelacionBase):
@@ -222,12 +235,11 @@ class CorrelacionCreate(CorrelacionBase):
 
 
 class Correlacion(CorrelacionBase):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     usuario_id: int
     fecha_calculo: datetime
-
-    class Config:
-        orm_mode = True
 
 
 # ===== Chat Message Schema (para el endpoint de chat) =====
@@ -235,14 +247,14 @@ class ChatMessage(BaseModel):
     usuario_id: int = Field(..., gt=0, description="ID del usuario")
     mensaje: str = Field(..., min_length=1, max_length=2000, description="Mensaje del usuario")
 
-    @validator('mensaje')
+    @field_validator('mensaje')
+    @classmethod
     def validate_mensaje(cls, v):
-        # Sanitizar HTML
-        v = v.replace('<', '&lt;').replace('>', '&gt;')
-        # Validar que no sea solo espacios
+        # Usar sanitización centralizada completa
+        v = sanitize_user_input(v, max_length=2000, check_sql=True, check_xss=True)
         if not v.strip():
             raise ValueError('El mensaje no puede estar vacío')
-        return v.strip()
+        return v
 
 
 class ChatResponse(BaseModel):
@@ -261,9 +273,10 @@ class FeedbackCreate(BaseModel):
     ayudo: bool = Field(..., description="¿La respuesta ayudó?")
     notas: Optional[str] = Field(None, max_length=2000)
 
-    @validator('mensaje_usuario', 'respuesta_loki', 'notas')
+    @field_validator('mensaje_usuario', 'respuesta_loki', 'notas')
+    @classmethod
     def sanitize_text(cls, v):
         if v is None:
             return v
-        v = v.replace('<', '&lt;').replace('>', '&gt;')
-        return v.strip()
+        # Sanitizar todos los campos de texto con validación completa
+        return sanitize_user_input(v, max_length=10000, check_sql=True, check_xss=True)

@@ -196,12 +196,18 @@ class RespuestaExitosa(Base):
     __tablename__ = 'respuestas_exitosas'
 
     id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False, index=True)
     patron_pregunta = Column(String, nullable=False)  # Patrón/tipo de pregunta
     respuesta_efectiva = Column(Text, nullable=False)  # La respuesta que funcionó
     veces_usado = Column(Integer, default=1)  # Cuántas veces se usó con éxito
     utilidad_promedio = Column(Float, default=5.0)  # Rating promedio (1-5)
     fecha_descubierta = Column(DateTime, default=datetime.datetime.utcnow)
-    fecha_ultima_uso = Column(DateTime, default=datetime.datetime.utcnow)
+    fecha_ultima_uso = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+
+    # Índices compuestos para optimizar búsqueda de respuestas efectivas
+    __table_args__ = (
+        Index('ix_respuestas_usuario_patron', 'usuario_id', 'patron_pregunta'),
+        Index('ix_respuestas_usuario_utilidad', 'usuario_id', 'utilidad_promedio'),
+    )
 
     usuario = relationship("Usuario", back_populates="respuestas_exitosas")
