@@ -112,6 +112,9 @@ async def receive_webhook(request: Request, db: Session = Depends(get_db)):
             db.refresh(usuario)
             logger.info(f"Nombre de usuario actualizado a: {profile_name}")
         
+        # 🔍 DEBUG: Log del nombre actual del usuario
+        logger.info(f"📝 Usuario cargado: ID={usuario.id}, Nombre='{usuario.nombre}', Teléfono={phone_number}")
+        
         # Obtener conversaciones recientes para contexto
         conversaciones_recientes = crud.get_conversaciones_by_usuario(
             db, usuario_id=usuario.id, limit=5
@@ -146,6 +149,9 @@ async def receive_webhook(request: Request, db: Session = Depends(get_db)):
             db.commit()
             db.refresh(usuario)
             logger.info(f"✅ Nombre actualizado a: {nombre_detectado} para usuario {usuario.id}")
+            
+            # 🔧 IMPORTANTE: La respuesta ya tiene el nombre correcto porque
+            # generate_response() la genera con el nombre detectado
         
         # Guardar la conversación
         conversacion_data = schemas.ConversacionContextoCreate(

@@ -517,18 +517,9 @@ Ejemplos:
             nombre_detectado = self._extract_name_from_message(mensaje_usuario)
             
             if nombre_detectado:
-                # ✅ Nombre detectado! Actualizar en BD si tenemos sesión
-                if db_session and usuario_id:
-                    try:
-                        from app import crud
-                        usuario = crud.get_usuario(db_session, usuario_id)
-                        if usuario:
-                            usuario.nombre = nombre_detectado
-                            db_session.commit()
-                            logger.info(f"✅ Nombre guardado: {nombre_detectado} para usuario {usuario_id}")
-                    except Exception as e:
-                        logger.error(f"⚠️ Error guardando nombre: {e}")
-                        db_session.rollback()
+                # ✅ Nombre detectado! NO actualizar aquí, dejar que el webhook lo haga
+                # Solo retornar el nombre detectado para que el webhook lo guarde
+                logger.info(f"✅ Nombre detectado: {nombre_detectado} para usuario {usuario_id}")
                 
                 # Responder con un saludo personalizado
                 return {
@@ -555,18 +546,8 @@ Ejemplos:
             # El usuario está diciendo un nombre diferente al registrado
             logger.info(f"🔄 Usuario intentando actualizar nombre de '{usuario_nombre}' a '{nombre_detectado_nuevo}'")
             
-            # Actualizar en BD si tenemos sesión
-            if db_session and usuario_id:
-                try:
-                    from app import crud
-                    usuario = crud.get_usuario(db_session, usuario_id)
-                    if usuario:
-                        usuario.nombre = nombre_detectado_nuevo
-                        db_session.commit()
-                        logger.info(f"✅ Nombre actualizado: {nombre_detectado_nuevo} para usuario {usuario_id}")
-                except Exception as e:
-                    logger.error(f"⚠️ Error actualizando nombre: {e}")
-                    db_session.rollback()
+            # NO actualizar en BD aquí, dejar que el webhook lo haga
+            # Solo retornar el nombre detectado
             
             # Confirmar el cambio de nombre
             return {
