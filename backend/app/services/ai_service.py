@@ -16,6 +16,7 @@ from app.services.memory_service import memory_service
 from app.services.trust_level_service import trust_service
 from app.services.emotional_memory_service import emotional_memory_service
 from app.services.progress_tracker_service import progress_tracker_service
+from app.services.pending_topics_service import pending_topics_service
 
 logger = setup_logger(__name__)
 
@@ -243,6 +244,21 @@ Ejemplos:
                     logger.info(f"📈 Progreso incluido en prompt: {progress_insight.tipo}")
             except Exception as e:
                 logger.error(f"⚠️ Error obteniendo insights de progreso: {e}")
+        
+        # 🎯 NUEVO: Agregar sugerencias de seguimiento de temas pendientes
+        if db_session and usuario_id and nivel_confianza >= 2:
+            try:
+                followup_context = pending_topics_service.get_followup_suggestions(
+                    db_session,
+                    usuario_id,
+                    nivel_confianza
+                )
+                
+                if followup_context:
+                    prompt += f"\n\n{followup_context}\n"
+                    logger.info("🎯 Sugerencia de seguimiento incluida en prompt")
+            except Exception as e:
+                logger.error(f"⚠️ Error obteniendo seguimientos: {e}")
 
         # Agregar contexto histórico de largo plazo solo si el nivel de confianza es alto (3+)
         if db_session and usuario_id and nivel_confianza >= 3:
@@ -548,6 +564,37 @@ Ejemplos:
                     logger.info(f"💭 Memoria emocional guardada: {emotional_memory.tema} - {emotional_memory.sentimiento}")
             except Exception as e:
                 logger.error(f"⚠️ Error procesando memoria emocional: {e}")
+        
+        # 🎯 NUEVA: Detectar y gestionar temas pendientes
+        pending_topics_detected = []
+        resolved_topics = []
+        if db_session and usuario_id:
+            try:
+                # 1. Verificar si se resolvieron temas pendientes anteriores
+                resolved_topics = pending_topics_service.check_topic_resolutions(
+                    db_session, usuario_id, mensaje_usuario
+                )
+                
+                # 2. Detectar nuevos temas pendientes mencionados
+                pending_topics_detected = pending_topics_service.detect_pending_topics(
+                    db_session,
+                    usuario_id,
+                    mensaje_usuario,
+                    mood_score=extracted_context.get('mood_level')
+                )
+                
+                # 3. Guardar nuevos temas pendientes
+                if pending_topics_detected:
+                    pending_topics_service.save_pending_topics(
+                        db_session, usuario_id, pending_topics_detected
+                    )
+                    logger.info(f"🎯 Detectados {len(pending_topics_detected)} temas pendientes")
+                
+                if resolved_topics:
+                    logger.info(f"✅ Resueltos {len(resolved_topics)} temas pendientes")
+                    
+            except Exception as e:
+                logger.error(f"⚠️ Error procesando temas pendientes: {e}")
         
         # Obtener insights de patrones personales si hay BD disponible
         pattern_insight = ""

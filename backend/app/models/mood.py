@@ -164,6 +164,7 @@ class PerfilUsuario(Base):
     historial_temas_recurrentes = Column(Text, nullable=True)  # JSON: temas que aparecen frecuentemente
     emociones_primarias_frecuentes = Column(Text, nullable=True)  # JSON: emociones dominantes
     valores_principales = Column(Text, nullable=True)  # JSON: valores detectados
+    topics_pendientes = Column(Text, nullable=True)  # JSON: temas mencionados pendientes de seguimiento
     fecha_actualizacion = Column(DateTime, default=datetime.datetime.utcnow)
     fecha_creacion = Column(DateTime, default=datetime.datetime.utcnow)
 
