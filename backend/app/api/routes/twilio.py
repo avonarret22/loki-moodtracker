@@ -140,20 +140,29 @@ El link es válido por 24 horas."""
             db, usuario_id=usuario.id, limit=5
         )
         
+        # 🎯 ONBOARDING: Detectar si es usuario nuevo (primera interacción)
+        es_usuario_nuevo = len(conversaciones_recientes) == 0
+        
         contexto_reciente = [
             {
                 'mensaje_usuario': conv.mensaje_usuario,
-                'respuesta_loki': conv.respuesta_loki
+                'respuesta_loki': conv.respuesta_loki,
+                'entidades_extraidas': conv.entidades_extraidas
             }
             for conv in conversaciones_recientes
         ]
         
-        # Generar respuesta con Loki AI
-        ai_response = await loki_service.generate_response(
-            mensaje_usuario=message_text,
-            usuario_nombre=usuario.nombre,
-            contexto_reciente=contexto_reciente
-        )
+        # Si es usuario nuevo, enviar onboarding
+        if es_usuario_nuevo:
+            logger.info(f"🎉 Nuevo usuario detectado: {usuario.id} - Enviando onboarding")
+            ai_response = loki_service.generate_onboarding_message(usuario.nombre)
+        else:
+            # Generar respuesta con Loki AI
+            ai_response = await loki_service.generate_response(
+                mensaje_usuario=message_text,
+                usuario_nombre=usuario.nombre,
+                contexto_reciente=contexto_reciente
+            )
         
         # Guardar la conversación
         conversacion_data = schemas.ConversacionContextoCreate(

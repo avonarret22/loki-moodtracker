@@ -63,6 +63,52 @@ class LokiAIService:
         # 3. Si nada funciona, usar reglas
         if not self.ai_provider:
             print("[WARNING] ⚠️ No hay API de IA disponible, usando respuestas basadas en reglas")
+    
+    def generate_onboarding_message(self, usuario_nombre: str) -> Dict[str, Any]:
+        """
+        Genera el mensaje de bienvenida/onboarding para nuevos usuarios.
+        Explica qué es Loki, cómo funciona y el sistema de confianza.
+        """
+        # Detectar si tiene un nombre real o es nombre temporal
+        tiene_nombre_real = usuario_nombre and not usuario_nombre.startswith("Usuario ")
+        
+        saludo_nombre = f"{usuario_nombre}" if tiene_nombre_real else ""
+        
+        # Mensaje conciso y amigable para WhatsApp
+        mensaje_onboarding = f"""¡Hola{' ' + saludo_nombre if tiene_nombre_real else ''}! 👋
+
+Soy *Loki*, tu compañero de bienestar emocional 🤖
+
+*¿Qué hago?*
+• Registro tu estado de ánimo 📊
+• Te escucho sin juzgar 💬
+• Sigo tus hábitos saludables 🎯
+• Encuentro patrones en tu bienestar 📈
+
+*Sistema de Confianza 🤝*
+Mientras más hablamos, mejor te entiendo:
+
+1️⃣ Conociendo → 2️⃣ Cordial → 3️⃣ Cercano → 4️⃣ Amigo → 5️⃣ Confidente
+
+Subes de nivel cada ~10 conversaciones. Ahora estás en nivel 1 (Conociendo).
+
+*Para empezar:*
+Solo háblame natural. Por ejemplo:
+• "Hoy me siento [bien/mal/regular]"
+• "Hice ejercicio"
+• "Me siento ansioso"
+
+También puedes enviar *"dashboard"* para ver tus estadísticas.
+
+{"*¿Cómo te llamas?* Me gustaría conocerte 😊" if not tiene_nombre_real else "*¿Cómo te sientes hoy?*"}"""
+
+        return {
+            'respuesta': mensaje_onboarding,
+            'context_extracted': {'onboarding_enviado': True},
+            'nombre_detectado': None,
+            'esperando_nombre': not tiene_nombre_real,
+            'needs_followup': True
+        }
         
     def _get_trust_based_system_prompt(self, usuario_nombre: str, nivel_confianza: int, nivel_info: Dict) -> str:
         """
