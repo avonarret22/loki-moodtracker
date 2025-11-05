@@ -111,7 +111,7 @@ def _collect_dashboard_data(db: Session, usuario) -> dict:
     pattern_analysis = pattern_service.analyze_user_patterns(db, usuario_id, days_lookback=30)
     
     # Nivel de confianza
-    trust_info = trust_service.get_user_trust_info(db, usuario_id)
+    trust_info = trust_service.get_user_trust_info(usuario_id, db=db)
     
     # Memorias emocionales recientes
     emotional_memories = emotional_memory_service.get_recent_memories(db, usuario_id, limit=5)
