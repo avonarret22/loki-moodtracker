@@ -46,7 +46,7 @@ class EstadoAnimo(EstadoAnimoBase):
 
 # ===== Usuario Schemas =====
 class UsuarioBase(BaseModel):
-    nombre: str = Field(..., min_length=2, max_length=100, description="Nombre del usuario")
+    nombre: Optional[str] = Field(None, min_length=2, max_length=100, description="Nombre del usuario (opcional, Loki lo preguntará)")
     telefono: str = Field(
         ...,
         pattern=r'^\+?[1-9]\d{1,14}$',  # E.164 format (regex -> pattern en Pydantic v2)
@@ -57,6 +57,8 @@ class UsuarioBase(BaseModel):
     @field_validator('nombre')
     @classmethod
     def sanitize_nombre(cls, v):
+        if v is None:
+            return v
         # Usar sanitización centralizada
         v = sanitize_user_input(v, max_length=100, check_sql=True, check_xss=True)
         # Permitir solo letras, espacios, guiones y apóstrofes

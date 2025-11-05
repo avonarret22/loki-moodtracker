@@ -10,9 +10,13 @@ from datetime import datetime
 from anthropic import Anthropic
 
 from app.core.config import settings
+from app.core.logger import setup_logger
 from app.services.nlp_service import nlp_service
 from app.services.memory_service import memory_service
 from app.services.trust_level_service import trust_service
+from app.services.emotional_memory_service import emotional_memory_service
+
+logger = setup_logger(__name__)
 
 
 class LokiAIService:
@@ -238,6 +242,82 @@ Ejemplos:
 
         return prompt
     
+    def _is_asking_for_name(self, usuario_nombre: Optional[str]) -> bool:
+        """
+        Determina si debemos preguntar el nombre al usuario.
+        Returns True si el usuario no tiene nombre registrado.
+        """
+        return usuario_nombre is None or usuario_nombre.strip() == ""
+    
+    def _extract_name_from_message(self, mensaje: str) -> Optional[str]:
+        """
+        Intenta extraer el nombre del usuario de su mensaje.
+        Busca patrones como "Soy X", "Me llamo X", "Mi nombre es X", o simplemente "X" si es corto.
+        """
+        import re
+        
+        mensaje = mensaje.strip()
+        
+        # Lista de palabras comunes que NO son nombres
+        palabras_comunes = {
+            'hola', 'hi', 'hello', 'hey', 'buenas', 'buenos', 'bien', 'mal', 'gracias',
+            'si', 'no', 'ok', 'vale', 'que', 'como', 'cuando', 'donde', 'quien',
+            'estoy', 'soy', 'eres', 'estás', 'está', 'tal', 'genial', 'perfecto',
+            'regular', 'más', 'menos', 'muy', 'poco', 'mucho', 'nada', 'algo'
+        }
+        
+        # Patrones comunes de presentación
+        patterns = [
+            r'(?:me llamo|mi nombre es)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)',
+            r'^soy\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)$',
+            r'(?:puedes decirme|dime|llamame|ll[áa]mame)\s+([a-záéíóúñ]+)',
+            r'^([a-záéíóúñ]+)$',  # Solo nombre (si es una palabra)
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, mensaje.lower())
+            if match:
+                nombre = match.group(1).strip()
+                
+                # Verificar que no sea una palabra común
+                if nombre.lower() in palabras_comunes:
+                    continue
+                
+                # Capitalizar correctamente
+                nombre_capitalizado = ' '.join(word.capitalize() for word in nombre.split())
+                
+                # Validar que sea un nombre razonable (2-30 caracteres, solo letras y espacios)
+                if 2 <= len(nombre_capitalizado) <= 30 and re.match(r'^[a-záéíóúñA-ZÁÉÍÓÚÑ\s]+$', nombre_capitalizado):
+                    return nombre_capitalizado
+        
+        return None
+    
+    def _generate_ask_name_response(self) -> str:
+        """
+        Genera una respuesta natural pidiendo el nombre al usuario.
+        """
+        responses = [
+            "Hola! Soy Loki 🐺 ¿Cómo te llamas?",
+            "Hey! Soy Loki. ¿Cómo prefieres que te llame?",
+            "Hola! Soy Loki, tu compañero de bienestar. ¿Cuál es tu nombre?",
+            "Hola! Me llamo Loki. ¿Y tú?",
+        ]
+        import random
+        return random.choice(responses)
+    
+    def _generate_greeting_with_name(self, nombre: str) -> str:
+        """
+        Genera un saludo natural después de conocer el nombre.
+        """
+        responses = [
+            f"Encantado, {nombre}! ¿Cómo estás hoy?",
+            f"Genial conocerte, {nombre}. ¿Cómo te sientes?",
+            f"Mucho gusto, {nombre}. ¿Qué tal tu día?",
+            f"Perfecto, {nombre}. ¿Cómo has estado?",
+        ]
+        import random
+        return random.choice(responses)
+    
     def extract_mood_level(self, mensaje: str) -> Optional[int]:
         """
         Extrae el nivel de ánimo del mensaje si está presente.
@@ -364,10 +444,63 @@ Ejemplos:
         """
         Genera una respuesta de Loki basada en el mensaje del usuario.
         Ahora incluye análisis de patrones personales y análisis NLP avanzado.
+        
+        🆕 FLUJO DE OBTENCIÓN DE NOMBRE:
+        - Si el usuario no tiene nombre, Loki lo pide en la primera interacción
+        - Extrae automáticamente el nombre de la respuesta del usuario
+        - Actualiza la BD con el nombre detectado
 
         Returns:
-            Dict con 'respuesta', 'context_extracted', 'pattern_insights' y otros metadatos
+            Dict con 'respuesta', 'context_extracted', 'pattern_insights', 'nombre_detectado' y otros metadatos
         """
+        # 🎭 FLUJO: Obtención del nombre del usuario
+        if self._is_asking_for_name(usuario_nombre):
+            # Primera vez: pedir el nombre
+            if not contexto_reciente or len(contexto_reciente) == 0:
+                return {
+                    'respuesta': self._generate_ask_name_response(),
+                    'context_extracted': {},
+                    'nombre_detectado': None,
+                    'esperando_nombre': True,
+                    'needs_followup': False
+                }
+            
+            # Segunda vez: el usuario está respondiendo con su nombre
+            nombre_detectado = self._extract_name_from_message(mensaje_usuario)
+            
+            if nombre_detectado:
+                # ✅ Nombre detectado! Actualizar en BD si tenemos sesión
+                if db_session and usuario_id:
+                    try:
+                        from app import crud
+                        usuario = crud.get_usuario(db_session, usuario_id)
+                        if usuario:
+                            usuario.nombre = nombre_detectado
+                            db_session.commit()
+                            logger.info(f"✅ Nombre guardado: {nombre_detectado} para usuario {usuario_id}")
+                    except Exception as e:
+                        logger.error(f"⚠️ Error guardando nombre: {e}")
+                        db_session.rollback()
+                
+                # Responder con un saludo personalizado
+                return {
+                    'respuesta': self._generate_greeting_with_name(nombre_detectado),
+                    'context_extracted': {},
+                    'nombre_detectado': nombre_detectado,
+                    'esperando_nombre': False,
+                    'needs_followup': False
+                }
+            else:
+                # No se detectó nombre válido, volver a preguntar amablemente
+                return {
+                    'respuesta': "No estoy seguro de haber entendido tu nombre. ¿Podrías decírmelo de nuevo?",
+                    'context_extracted': {},
+                    'nombre_detectado': None,
+                    'esperando_nombre': True,
+                    'needs_followup': False
+                }
+        
+        # 🎯 FLUJO NORMAL: Usuario ya tiene nombre
         # Preparar historial conversacional para análisis NLP
         conversation_history = []
         if contexto_reciente:
@@ -375,6 +508,24 @@ Ejemplos:
 
         # Analizar el contexto del mensaje (ahora con NLP avanzado)
         extracted_context = self.analyze_message_context(mensaje_usuario, conversation_history)
+        
+        # 🧠 NUEVA: Extraer y guardar memoria emocional
+        emotional_memory = None
+        if db_session and usuario_id:
+            try:
+                emotional_memory = emotional_memory_service.extract_emotional_memory(
+                    db_session,
+                    usuario_id,
+                    mensaje_usuario,
+                    mood_level=extracted_context.get('mood_level')
+                )
+                
+                # Guardar si es significativo
+                if emotional_memory:
+                    emotional_memory_service.save_memory(db_session, usuario_id, emotional_memory)
+                    logger.info(f"💭 Memoria emocional guardada: {emotional_memory.tema} - {emotional_memory.sentimiento}")
+            except Exception as e:
+                logger.error(f"⚠️ Error procesando memoria emocional: {e}")
         
         # Obtener insights de patrones personales si hay BD disponible
         pattern_insight = ""
