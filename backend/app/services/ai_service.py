@@ -615,9 +615,37 @@ Ejemplos:
                 }
         
         # 🎯 FLUJO NORMAL: Usuario ya tiene nombre
-        # 🆕 Pero primero verificar si está intentando actualizar su nombre
+        
+        # 🆕 NUEVO: Verificar si está preguntando por su nombre
+        mensaje_lower = mensaje_usuario.lower().strip()
+        preguntas_nombre = [
+            'cual es mi nombre', 'cuál es mi nombre', 'como me llamo', 'cómo me llamo',
+            'mi nombre', 'sabes mi nombre', 'recuerdas mi nombre', 'que nombre tengo',
+            'qué nombre tengo', 'mi nombre?', 'cual es mi nombre?'
+        ]
+        
+        if any(pregunta in mensaje_lower for pregunta in preguntas_nombre):
+            # Usuario pregunta por su nombre
+            if usuario_nombre and not usuario_nombre.startswith("Usuario "):
+                return {
+                    'respuesta': f"Tu nombre es {usuario_nombre}. ¿Quieres que lo cambie?",
+                    'context_extracted': {},
+                    'nombre_detectado': None,
+                    'esperando_nombre': False,
+                    'needs_followup': False
+                }
+            else:
+                return {
+                    'respuesta': "Aún no me has dicho tu nombre. ¿Cómo te llamas?",
+                    'context_extracted': {},
+                    'nombre_detectado': None,
+                    'esperando_nombre': True,
+                    'needs_followup': False
+                }
+        
+        # 🆕 Verificar si está intentando actualizar su nombre
         nombre_detectado_nuevo = self._extract_name_from_message(mensaje_usuario)
-        if nombre_detectado_nuevo and nombre_detectado_nuevo.lower() != usuario_nombre.lower():
+        if nombre_detectado_nuevo and usuario_nombre and nombre_detectado_nuevo.lower() != usuario_nombre.lower():
             # El usuario está diciendo un nombre diferente al registrado
             logger.info(f"🔄 Usuario intentando actualizar nombre de '{usuario_nombre}' a '{nombre_detectado_nuevo}'")
             

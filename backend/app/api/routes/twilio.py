@@ -81,12 +81,25 @@ async def receive_twilio_webhook(
         # 🆕 DETECCIÓN Y ACTUALIZACIÓN DE NOMBRE
         # Verificar si el mensaje contiene el nombre del usuario
         nombre_detectado = loki_service._extract_name_from_message(message_text)
-        if nombre_detectado and (not usuario.nombre or usuario.nombre.startswith("Usuario ")):
-            # Actualizar nombre del usuario en BD
+        
+        # Actualizar si:
+        # 1. No tiene nombre (None)
+        # 2. Tiene nombre temporal ("Usuario XXXX")
+        # 3. El nombre detectado es diferente al actual (corrección de errores como "Diego Recuerdalo")
+        debe_actualizar = (
+            nombre_detectado and (
+                not usuario.nombre or 
+                usuario.nombre.startswith("Usuario ") or
+                (usuario.nombre and nombre_detectado.lower() != usuario.nombre.lower())
+            )
+        )
+        
+        if debe_actualizar:
+            nombre_anterior = usuario.nombre
             usuario.nombre = nombre_detectado
             db.commit()
             db.refresh(usuario)
-            logger.info(f"✅ Nombre actualizado: {nombre_detectado} para usuario {usuario.id}")
+            logger.info(f"✅ Nombre actualizado de '{nombre_anterior}' a '{nombre_detectado}' para usuario {usuario.id}")
         
         # COMANDO ESPECIAL: Dashboard
         message_lower = message_text.lower().strip()
